@@ -35,7 +35,6 @@ class FeedView(Gtk.Box):
         scrolled.set_vexpand(True)
 
         self._note_list = NoteList()
-        self._note_list.set_row_spacing(8)
         scrolled.set_child(self._note_list)
         self.append(scrolled)
 

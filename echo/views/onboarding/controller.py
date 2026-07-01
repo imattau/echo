@@ -13,13 +13,13 @@ from echo.services.relay_manager import RelayManager
 from echo.utils.config import Config, Settings
 
 
-class OnboardingController(Adw.Window):
+class OnboardingController(Adw.ApplicationWindow):
     __gsignals__ = {
         "done": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.set_title("Welcome to Echo")
         self.set_default_size(640, 520)
         self.set_modal(True)

@@ -127,7 +127,7 @@ class ContactsView(Gtk.Box):
         content.append(header)
 
         search = Gtk.SearchEntry()
-        search.set_placeholder_text("Search contacts by name or npub")
+        search.set_property("placeholder-text", "Search contacts by name or npub")
         search.set_margin_start(32)
         search.set_margin_end(32)
         search.set_margin_bottom(16)

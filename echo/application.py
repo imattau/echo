@@ -41,7 +41,7 @@ class EchoApplication(Adw.Application):
             if has_identity and onboarding_done:
                 win = EchoWindow(application=self, key_manager=key_manager)
             else:
-                win = OnboardingController()
+                win = OnboardingController(application=self)
                 win.connect("done", self._on_onboarding_done)
 
         win.present()
