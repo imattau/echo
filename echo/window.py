@@ -1,3 +1,5 @@
+import json
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -61,7 +63,14 @@ class EchoWindow(Adw.ApplicationWindow):
             self._pages[name] = page
             self.content.add_named(page, name)
 
-        self.content.set_visible_child_name("feed")
+        settings = Settings.get()
+        initial_page = "following" if settings.get_bool("open-to-following-feed") else "feed"
+        self.content.set_visible_child_name(initial_page)
+
+        self._state_file = Config.STATE_DIR / "window_state.json"
+        self._restore_window_state(settings)
+
+        self.connect("close-request", self._on_close_request)
 
         self.sidebar.connect("nav-changed", self._on_nav_changed)
         self.sidebar.connect("new-note", self._on_new_note)
@@ -98,6 +107,28 @@ class EchoWindow(Adw.ApplicationWindow):
         if self._key_manager.has_key:
             for url in Config.DEFAULT_RELAYS:
                 self._relay_manager.add_relay(url)
+
+    def _restore_window_state(self, settings):
+        if settings.get_bool("restore-last-window-state"):
+            try:
+                if self._state_file.exists():
+                    data = json.loads(self._state_file.read_text())
+                    w = data.get("width", 1200)
+                    h = data.get("height", 800)
+                    self.set_default_size(w, h)
+            except Exception:
+                pass
+
+    def _on_close_request(self, *args):
+        settings = Settings.get()
+        if settings.get_bool("restore-last-window-state"):
+            try:
+                w, h = self.get_default_size()
+                Config.STATE_DIR.mkdir(parents=True, exist_ok=True)
+                self._state_file.write_text(json.dumps({"width": w, "height": h}))
+            except Exception:
+                pass
+        return False
 
     def _on_nav_changed(self, _sidebar, page_name: str):
         self.sidebar.set_active(page_name)
