@@ -44,7 +44,7 @@ class ErrorDialog(Adw.Window):
 
         retry_btn = Gtk.Button(label=primary_label)
         retry_btn.add_css_class("suggested-action")
-        retry_btn.connect("clicked", lambda _: self.emit("retry"))
+        retry_btn.connect("clicked", lambda _: [self.emit("retry"), self.close()])
         buttons.append(retry_btn)
 
         content.append(buttons)
@@ -89,7 +89,7 @@ class ConfirmDialog(Adw.Window):
         confirm_btn = Gtk.Button(label=destructive_label)
         if destructive:
             confirm_btn.add_css_class("destructive-action")
-        confirm_btn.connect("clicked", lambda _: self.emit("confirm"))
+        confirm_btn.connect("clicked", lambda _: [self.emit("confirm"), self.close()])
         buttons.append(confirm_btn)
 
         content.append(buttons)

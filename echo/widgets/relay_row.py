@@ -18,10 +18,12 @@ class RelayRow(Gtk.Box):
         self.set_margin_top(12)
         self.set_margin_bottom(12)
 
+        status_str = status.name.lower() if hasattr(status, "name") else str(status).lower()
+
         status_dot = Gtk.DrawingArea()
         status_dot.set_size_request(9, 9)
         status_dot.add_css_class("status-dot")
-        status_dot.add_css_class(f"status-{status}")
+        status_dot.add_css_class(f"status-{status_str}")
         self.append(status_dot)
 
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)

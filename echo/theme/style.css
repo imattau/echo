@@ -1,6 +1,6 @@
 .sidebar {
-    background-color: #ECECEC;
-    border-right: 1px solid #E0E0E0;
+    background-color: @card_bg_color;
+    border-right: 1px solid @borders;
 }
 
 .app-title {
@@ -9,47 +9,59 @@
 }
 
 .new-note-button {
-    background-color: #3584E4;
-    color: #FFFFFF;
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
     font-weight: 600;
     border-radius: 8px;
     padding: 8px 14px;
 }
 
+.primary-button {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
 .note-card {
-    background-color: #FFFFFF;
+    background-color: @card_bg_color;
     border-radius: 12px;
-    border: 1px solid #E0E0E0;
+    border: 1px solid @borders;
 }
 
 .engagement-button {
-    background-color: #EDEDED;
+    background-color: @shade_color;
     border-radius: 8px;
     padding: 6px 12px;
 }
 
 .zap-button {
-    background-color: #FAEBC7;
+    background-color: alpha(@warning_color, 0.2);
     border-radius: 8px;
     padding: 6px 12px;
-    color: #E0991A;
+    color: @warning_color;
 }
 
 .zap-text {
-    color: #E0991A;
+    color: @warning_color;
     font-weight: 600;
 }
 
 .relay-chip {
-    background-color: #E7EEFB;
+    background-color: alpha(@accent_bg_color, 0.15);
     border-radius: 999px;
     padding: 4px 10px;
 }
 
 .relay-chip-text {
-    color: #3584E4;
+    color: @accent_bg_color;
     font-weight: 600;
     font-size: 10px;
+}
+
+.avatar {
+    border-radius: 999px;
 }
 
 .status-dot {
@@ -59,26 +71,34 @@
 }
 
 .status-connected {
-    background-color: #40A659;
+    background-color: @success_color;
 }
 
 .status-slow {
-    background-color: #D99926;
+    background-color: @warning_color;
 }
 
 .status-disconnected {
-    background-color: #CC4D4D;
+    background-color: @error_color;
+}
+
+.status-connecting {
+    background-color: @accent_bg_color;
+}
+
+.status-error {
+    background-color: @error_color;
 }
 
 .unread-dot {
     min-width: 8px;
     min-height: 8px;
     border-radius: 999px;
-    background-color: #3584E4;
+    background-color: @accent_bg_color;
 }
 
 .trending-pill {
-    background-color: #EDEDED;
+    background-color: @shade_color;
     border-radius: 8px;
     padding: 8px 10px;
 }
@@ -90,21 +110,21 @@
 .welcome-title {
     font-weight: 700;
     font-size: 24px;
-    color: #1C1C1C;
+    color: @theme_fg_color;
 }
 
 .settings-title {
     font-weight: 700;
     font-size: 22px;
-    color: #1C1C1C;
+    color: @theme_fg_color;
 }
 
 .profile-banner {
-    background-color: #CCDBF0;
+    background-color: alpha(@accent_bg_color, 0.15);
 }
 
 .profile-avatar {
-    background-color: #FFFFFF;
+    background-color: @theme_bg_color;
     border-radius: 48px;
 }
 
@@ -119,17 +139,17 @@
 }
 
 .stat-label {
-    color: #737373;
+    color: @insensitive_fg_color;
     font-size: 13px;
 }
 
 .video-overlay {
-    background-color: #292E38;
+    background-color: @shade_color;
     border-radius: 10px;
 }
 
 .duration-badge {
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: alpha(#000000, 0.6);
     border-radius: 5px;
     padding: 3px 7px;
     color: #FFFFFF;
@@ -138,25 +158,25 @@
 }
 
 .image-placeholder {
-    background-color: #CCDBF0;
+    background-color: alpha(@accent_bg_color, 0.15);
     border-radius: 10px;
 }
 
 .toast {
-    background-color: #262629;
+    background-color: @shade_color;
     border-radius: 10px;
     padding: 10px 16px;
-    color: #FFFFFF;
+    color: @theme_fg_color;
 }
 
 .error-banner {
-    background-color: #FAE8E8;
+    background-color: alpha(@error_color, 0.1);
     border-radius: 10px;
     padding: 12px 14px;
 }
 
 .offline-banner {
-    background-color: #FDF0DA;
+    background-color: alpha(@warning_color, 0.1);
     border-radius: 10px;
     padding: 10px 16px;
 }
@@ -168,16 +188,16 @@
 
 .error-icon {
     font-size: 30px;
-    color: #CC4D4D;
+    color: @error_color;
 }
 
 .resize-handle {
-    background-color: #D9D9D9;
+    background-color: @borders;
     border-radius: 3px;
     padding: 10px 0px;
 }
 
 .resize-dot {
-    background-color: #999999;
+    background-color: @insensitive_fg_color;
     border-radius: 999px;
 }

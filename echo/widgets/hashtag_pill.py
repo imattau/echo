@@ -2,16 +2,20 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 
-from gi.repository import Gtk
+from gi.repository import Gtk, GObject
 
 
-class HashtagPill(Gtk.Box):
+class HashtagPill(Gtk.Button):
+    __gsignals__ = {
+        "selected": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+    }
+
     def __init__(self, hashtag: str, count: str = ""):
-        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-
+        self._hashtag = hashtag
         label_text = f"#{hashtag}"
         if count:
             label_text += f" ({count})"
 
-        label = Gtk.Label(label=label_text)
-        self.append(label)
+        super().__init__(label=label_text)
+        self.add_css_class("trending-pill")
+        self.connect("clicked", lambda _: self.emit("selected", f"#{hashtag}"))

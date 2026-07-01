@@ -12,7 +12,7 @@ class EchoApplication(Adw.Application):
     def __init__(self):
         super().__init__(
             application_id="com.echo.nostr",
-            flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
+            flags=0,
         )
         self.connect("startup", self.on_startup)
         self.connect("activate", self.on_activate)

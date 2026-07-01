@@ -21,6 +21,7 @@ class DMListView(Gtk.Box):
         title.set_hexpand(True)
 
         compose_btn = Gtk.Button(label="✎")
+        compose_btn.set_tooltip_text("New conversation")
         header.append(title)
         header.append(compose_btn)
         self.append(header)

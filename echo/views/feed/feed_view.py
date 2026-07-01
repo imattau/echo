@@ -10,7 +10,7 @@ class FeedView(Gtk.Box):
         "refresh": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
-    def __init__(self):
+    def __init__(self, title_text="Home"):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -19,7 +19,7 @@ class FeedView(Gtk.Box):
         header.set_margin_top(16)
         header.set_margin_bottom(12)
 
-        title = Gtk.Label(label="Home")
+        title = Gtk.Label(label=title_text)
         title.set_halign(Gtk.Align.START)
         title.set_hexpand(True)
 

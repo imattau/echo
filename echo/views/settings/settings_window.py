@@ -49,13 +49,14 @@ class SettingsWindow(Adw.Window):
             "Notifications": NotificationsPage(),
         }
 
-        for name in items:
+        for i, name in enumerate(items):
             btn = Gtk.Button(label=name)
             btn.set_halign(Gtk.Align.START)
             page = pages.get(name)
             if page:
                 self._stack.add_named(page, name.lower())
-                self._stack.set_visible_child_name(name.lower())
+                if i == 0:
+                    self._stack.set_visible_child_name(name.lower())
             btn.connect("clicked", self._on_nav, name.lower())
             sidebar.append(btn)
 

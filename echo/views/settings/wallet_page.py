@@ -22,6 +22,7 @@ class WalletPage(Gtk.Box):
         wallet_name = Gtk.Label(label="Alby")
         balance = Gtk.Label(label="Balance: 42,300 sats")
         disconnect_btn = Gtk.Button(label="Disconnect")
+        disconnect_btn.add_css_class("destructive-action")
         card.append(wallet_name)
         card.append(balance)
         card.append(disconnect_btn)

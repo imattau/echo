@@ -1,8 +1,9 @@
 import gi
 
 gi.require_version("Gtk", "4.0")
+gi.require_version("GLib", "2.0")
 
-from gi.repository import Gtk, Pango, GObject
+from gi.repository import Gtk, GLib, Pango, GObject
 from echo.models import Note
 from .engagement_bar import EngagementBar
 from .avatar import Avatar
@@ -42,7 +43,8 @@ class NoteCard(Gtk.Box):
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         name = Gtk.Label(label=self._note.profile.handle if self._note.profile else "unknown")
         name.set_halign(Gtk.Align.START)
-        timestamp = Gtk.Label(label=str(self._note.created_at))
+        dt = GLib.DateTime.new_from_unix_utc(self._note.created_at)
+        timestamp = Gtk.Label(label=dt.format("%b %d, %H:%M") or str(self._note.created_at))
         timestamp.set_halign(Gtk.Align.START)
         info.append(name)
         info.append(timestamp)

@@ -3,6 +3,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 
 from gi.repository import Gtk, GObject
+from echo.widgets.hashtag_pill import HashtagPill
 
 
 class DiscoverView(Gtk.Box):
@@ -15,7 +16,7 @@ class DiscoverView(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
 
         self._search_entry = Gtk.SearchEntry()
-        self._search_entry.set_placeholder_text("Search notes, people, or nostr addresses")
+        self._search_entry.set_property("placeholder-text", "Search notes, people, or nostr addresses")
         self._search_entry.set_margin_start(16)
         self._search_entry.set_margin_end(16)
         self._search_entry.set_margin_top(16)
@@ -29,10 +30,9 @@ class DiscoverView(Gtk.Box):
         trending.set_margin_start(16)
         trending.set_margin_end(16)
 
-        for tag in ["#nostr", "#lightning", "#music", "#bitcoin", "#design"]:
-            pill = Gtk.Button(label=tag)
-            pill.add_css_class("trending-pill")
-            pill.connect("clicked", self._on_trending_click, tag)
+        for tag in ["nostr", "lightning", "music", "bitcoin", "design"]:
+            pill = HashtagPill(hashtag=tag)
+            pill.connect("selected", self._on_trending_selected)
             trending.append(pill)
 
         self.append(trending)
@@ -49,5 +49,5 @@ class DiscoverView(Gtk.Box):
         if query.strip():
             self.emit("search", query.strip())
 
-    def _on_trending_click(self, btn, tag: str):
+    def _on_trending_selected(self, pill, tag: str):
         self.emit("trending-tag", tag)

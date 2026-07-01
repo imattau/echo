@@ -18,8 +18,8 @@ class VideoOverlay(Gtk.Box):
         center.set_hexpand(True)
         center.set_vexpand(True)
 
-        play_btn = Gtk.DrawingArea()
-        play_btn.set_size_request(48, 48)
+        play_btn = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+        play_btn.set_pixel_size(48)
         center.append(play_btn)
 
         self.append(center)

@@ -11,5 +11,5 @@ class RelayChip(Gtk.Box):
         self.add_css_class("relay-chip")
 
         text = Gtk.Label(label=label)
-        text.set_css_classes(["relay-chip-text"])
+        text.add_css_class("relay-chip-text")
         self.append(text)
