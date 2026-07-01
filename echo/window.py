@@ -177,11 +177,31 @@ class EchoWindow(Adw.ApplicationWindow):
         if existing is not None:
             self.content.remove(existing)
             del self._pages["profile"]
-        profile = self._profile_service.get_cached(pubkey) or None
-        view = ProfileView(profile=profile)
+        own_pk = self._key_manager.pubkey or ""
+        cached = self._profile_service.get_cached(pubkey)
+        view = ProfileView(profile=cached, own_pubkey=own_pk)
+        view.connect("back", lambda _v: self.content.set_visible_child_name("feed"))
+        view.connect("follow", lambda _v: self._on_profile_follow(view, pubkey))
+        view.connect("tab-changed", lambda _v, tab: self._on_profile_tab_changed(view, tab))
         self._pages["profile"] = view
         self.content.add_named(view, "profile")
         self.content.set_visible_child_name("profile")
+        if not cached or True:
+            self._profile_service.fetch_profile(pubkey, lambda p: view.set_profile(p))
+
+    def _on_profile_follow(self, view, pubkey: str):
+        pass
+
+    def _on_profile_tab_changed(self, view, tab: str):
+        view.clear_content()
+        if tab == "notes":
+            pass
+        elif tab == "replies":
+            pass
+        elif tab == "media":
+            pass
+        elif tab == "zapped":
+            pass
 
     def _on_note_zap(self, card):
         profile = card._note.profile if hasattr(card, "_note") else None
