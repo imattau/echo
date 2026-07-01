@@ -23,7 +23,8 @@ from .views.onboarding.import_key_view import ImportKeyView
 from echo.services.key_manager import KeyManager
 from echo.services.relay_manager import RelayManager
 from echo.services.profile_service import ProfileService
-from echo.utils.config import Config
+from echo.utils.config import Config, Settings
+from echo.widgets.error_dialog import ErrorDialog, ConfirmDialog
 
 
 class EchoWindow(Adw.ApplicationWindow):
@@ -108,7 +109,38 @@ class EchoWindow(Adw.ApplicationWindow):
 
     def _on_new_note(self, _sidebar):
         dialog = ComposeDialog(self)
+        dialog.connect("submit", self._on_compose_submit)
         dialog.present()
+
+    def _on_compose_submit(self, dialog, text: str):
+        settings = Settings.get()
+        if settings.get_bool("confirm-before-posting"):
+            confirm = ConfirmDialog(
+                self,
+                title="Post this note?",
+                message=text[:100] + ("…" if len(text) > 100 else ""),
+                destructive_label="Post",
+                destructive=False,
+            )
+            confirm.connect("confirm", lambda _: self._do_publish(text))
+            confirm.present()
+        else:
+            self._do_publish(text)
+
+    def _do_publish(self, text: str):
+        if not self._key_manager.has_key:
+            ErrorDialog(self, title="No identity", message="Set up your key first.").present()
+            return
+        from echo.services.event_signer import EventSigner
+        from echo.services.nostr_client import NostrClient
+        try:
+            keys = self._key_manager.keys
+            signer = EventSigner(keys)
+            event = signer.sign_text_note(text)
+            client = NostrClient()
+            client.publish_event(event)
+        except Exception:
+            ErrorDialog(self, title="Failed to post", message="Could not publish your note. Check your relay connection.").present()
 
     def _on_account_switch(self, _sidebar):
         popover = AccountSwitcherPopover()

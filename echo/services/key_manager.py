@@ -25,6 +25,10 @@ class KeyManager:
         return self._keys is not None
 
     @property
+    def keys(self) -> Optional[Keys]:
+        return self._keys
+
+    @property
     def pubkey(self) -> Optional[str]:
         if self._keys:
             return self._keys.public_key().to_hex()

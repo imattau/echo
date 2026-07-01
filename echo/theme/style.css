@@ -206,6 +206,11 @@
     font-size: 13px;
 }
 
+.count-over {
+    color: @error_color;
+    font-weight: 600;
+}
+
 .resize-handle {
     background-color: @borders;
     border-radius: 3px;
