@@ -6,15 +6,14 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk
 from .widgets.sidebar import Sidebar
 from .views.feed.feed_view import FeedView
-from .views.feed.thread_view import ThreadView
 from .views.discover.discover_view import DiscoverView
 from .views.dms.dm_list import DMListView
 from .views.bookmarks.bookmarks_view import BookmarksView
 from .views.relays.relays_view import RelaysView
-from .views.profile.profile_view import ProfileView
 from .views.modals.compose_dialog import ComposeDialog
 from .views.modals.account_switcher import AccountSwitcherPopover
 from .views.settings.settings_window import SettingsWindow
+from .views.onboarding.import_key_view import ImportKeyView
 from echo.services.key_manager import KeyManager
 from echo.services.relay_manager import RelayManager
 from echo.services.profile_service import ProfileService
@@ -31,7 +30,7 @@ class EchoWindow(Adw.ApplicationWindow):
         self._relay_manager = relay_manager or RelayManager()
         self._profile_service = ProfileService()
 
-        self.sidebar = Sidebar()
+        self.sidebar = Sidebar(key_manager=self._key_manager)
         self.sidebar.set_size_request(240, -1)
 
         self.content = Gtk.Stack()
@@ -76,6 +75,7 @@ class EchoWindow(Adw.ApplicationWindow):
                 self._relay_manager.add_relay(url)
 
     def _on_nav_changed(self, _sidebar, page_name: str):
+        self.sidebar.set_active(page_name)
         if page_name == "settings":
             window = SettingsWindow(self)
             window.present()
@@ -89,4 +89,19 @@ class EchoWindow(Adw.ApplicationWindow):
     def _on_account_switch(self, _sidebar):
         popover = AccountSwitcherPopover()
         popover.set_parent(self.sidebar)
+        popover.connect("add-account", self._on_add_account)
         popover.popup()
+
+    def _on_add_account(self, _popover):
+        import_view = ImportKeyView()
+        window = Adw.Window(transient_for=self, modal=True)
+        window.set_title("Import Existing Key")
+        window.set_default_size(560, 400)
+        window.set_content(import_view)
+        import_view.connect("import-key", self._on_import_key_from_switcher)
+        import_view.connect("back", lambda v: window.close())
+        window.present()
+
+    def _on_import_key_from_switcher(self, _view, key: str):
+        if self._key_manager.import_key(key):
+            self._key_manager.save_to_keyring()

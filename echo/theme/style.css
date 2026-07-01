@@ -3,6 +3,11 @@
     border-right: 1px solid @borders;
 }
 
+.sidebar .nav-active {
+    background-color: alpha(@accent_bg_color, 0.15);
+    border-radius: 8px;
+}
+
 .app-title {
     font-weight: 700;
     font-size: 18px;

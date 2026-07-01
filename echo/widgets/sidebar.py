@@ -4,6 +4,7 @@ gi.require_version("Gtk", "4.0")
 
 from gi.repository import Gtk, GObject
 from .avatar import Avatar
+from echo.services.key_manager import KeyManager
 
 
 class Sidebar(Gtk.Box):
@@ -13,15 +14,30 @@ class Sidebar(Gtk.Box):
         "account-switch": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
-    def __init__(self):
+    def __init__(self, key_manager=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add_css_class("sidebar")
-
+        self._key_manager = key_manager or KeyManager.get()
         self._nav_buttons = {}
+        self._active_name = None
+
         self._build_header()
         self._build_new_note_button()
         self._build_nav()
         self._build_account_switcher()
+
+        self.set_active("feed")
+
+    def set_active(self, name: str):
+        self._active_name = name
+        for nav_name, box in self._nav_buttons.items():
+            css = box.get_css_classes()
+            if nav_name == name:
+                if "nav-active" not in css:
+                    box.add_css_class("nav-active")
+            else:
+                if "nav-active" in css:
+                    box.remove_css_class("nav-active")
 
     def _build_header(self):
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -51,36 +67,28 @@ class Sidebar(Gtk.Box):
         nav_list.set_selection_mode(Gtk.SelectionMode.NONE)
 
         items = [
-            ("feed", "Home"),
-            ("following", "Following"),
-            ("discover", "Discover"),
-            ("dms", "Direct Messages"),
-            ("bookmarks", "Bookmarks"),
-            ("relays", "Relays"),
+            ("feed", "Home", "go-home-symbolic"),
+            ("following", "Following", "people-symbolic"),
+            ("discover", "Discover", "edit-find-symbolic"),
+            ("dms", "Direct Messages", "mail-symbolic"),
+            ("bookmarks", "Bookmarks", "emblem-favorite-symbolic"),
+            ("relays", "Relays", "network-server-symbolic"),
+            ("settings", "Settings", "emblem-system-symbolic"),
         ]
 
-        for name, label in items:
-            row = self._nav_item(name, label)
+        for name, label, icon_name in items:
+            row = self._nav_item(name, label, icon_name)
             nav_list.append(row)
 
         self.append(nav_list)
 
-    def _nav_item(self, name: str, label: str):
+    def _nav_item(self, name: str, label: str, icon_name: str):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         box.set_margin_start(10)
         box.set_margin_end(10)
         box.set_margin_top(8)
         box.set_margin_bottom(8)
 
-        icon_names = {
-            "feed": "go-home-symbolic",
-            "following": "people-symbolic",
-            "discover": "edit-find-symbolic",
-            "dms": "mail-symbolic",
-            "bookmarks": "emblem-favorite-symbolic",
-            "relays": "network-server-symbolic",
-        }
-        icon_name = icon_names.get(name, "view-list-symbolic")
         icon = Gtk.Image.new_from_icon_name(icon_name)
         icon.set_pixel_size(16)
 
@@ -107,16 +115,21 @@ class Sidebar(Gtk.Box):
         account_box.set_margin_end(12)
         account_box.set_margin_top(8)
         account_box.set_margin_bottom(8)
+        account_box.add_css_class("account-box")
 
-        avatar = Avatar(size=32, initials="M", color="#99BF8C")
+        pubkey = self._key_manager.npub or self._key_manager.pubkey or ""
+        short_id = pubkey[:12] if pubkey else "not set"
+        initials, color = self._initials_for_key(pubkey)
+
+        avatar = Avatar(size=32, initials=initials, color=color)
 
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        name = Gtk.Label(label="Matt")
+        name = Gtk.Label(label="Nostr Identity")
         name.set_halign(Gtk.Align.START)
-        npub = Gtk.Label(label="npub1matt…4kx2")
-        npub.set_halign(Gtk.Align.START)
+        npub_label = Gtk.Label(label=short_id)
+        npub_label.set_halign(Gtk.Align.START)
         info.append(name)
-        info.append(npub)
+        info.append(npub_label)
 
         dropdown = Gtk.Label(label="⌄")
 
@@ -129,3 +142,8 @@ class Sidebar(Gtk.Box):
         account_box.add_controller(gesture)
 
         self.append(account_box)
+
+    def _initials_for_key(self, pubkey: str):
+        if pubkey and len(pubkey) >= 2:
+            return pubkey[:2].upper(), "#3584E4"
+        return "?", "#99BF8C"

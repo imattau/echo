@@ -3,6 +3,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 
 from gi.repository import Gtk, GObject
+from echo.widgets.avatar import Avatar
 
 
 class DMConversationView(Gtk.Box):
@@ -19,8 +20,7 @@ class DMConversationView(Gtk.Box):
         header.set_margin_top(16)
         header.set_margin_bottom(12)
 
-        avatar = Gtk.DrawingArea()
-        avatar.set_size_request(32, 32)
+        avatar = Avatar(size=32, initials="?")
         header.append(avatar)
 
         self._contact_name = Gtk.Label(label="Contact")

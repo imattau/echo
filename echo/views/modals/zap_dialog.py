@@ -4,6 +4,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
 from gi.repository import Gtk, Adw, GObject
+from echo.widgets.avatar import Avatar
 
 
 class ZapDialog(Adw.Window):
@@ -34,8 +35,7 @@ class ZapDialog(Adw.Window):
         content.append(header)
 
         recipient_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        avatar = Gtk.DrawingArea()
-        avatar.set_size_request(32, 32)
+        avatar = Avatar(size=32, initials=recipient_name[:2].upper() if recipient_name else "?")
         recipient_row.append(avatar)
         recipient_label = Gtk.Label(label=recipient_name or "Recipient")
         recipient_row.append(recipient_label)
@@ -48,9 +48,14 @@ class ZapDialog(Adw.Window):
         grid.set_row_spacing(8)
 
         amounts = [21, 100, 500, 1000, 5000, 10000]
+        self._amount_group = None
         for i, amount in enumerate(amounts):
-            btn = Gtk.Button(label=f"⚡{amount}")
-            btn.connect("clicked", self._on_amount_selected, amount)
+            btn = Gtk.ToggleButton(label=f"⚡{amount}")
+            btn.set_group(self._amount_group)
+            self._amount_group = btn
+            if amount == 500:
+                btn.set_active(True)
+            btn.connect("toggled", self._on_amount_toggled, amount)
             grid.attach(btn, i % 3, i // 3, 1, 1)
             self._amount_buttons.append(btn)
 
@@ -73,14 +78,17 @@ class ZapDialog(Adw.Window):
         self.set_content(content)
         self._update_amount_display()
 
-    def _on_amount_selected(self, btn, amount: int):
-        self._selected_amount = amount
-        self._update_amount_display()
+    def _on_amount_toggled(self, btn, amount: int):
+        if btn.get_active():
+            self._selected_amount = amount
+            self._update_amount_display()
 
     def _on_custom_amount(self, entry):
         try:
             amount = int(entry.get_text())
             if amount > 0:
+                for b in self._amount_buttons:
+                    b.set_active(False)
                 self._selected_amount = amount
                 self._update_amount_display()
         except ValueError:

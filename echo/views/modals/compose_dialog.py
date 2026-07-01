@@ -31,11 +31,14 @@ class ComposeDialog(Adw.Window):
         header.append(close_btn)
         content.append(header)
 
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+
         self._text_view = Gtk.TextView()
         self._text_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
-        self._text_view.set_vexpand(True)
         self._text_view.set_placeholder_text("What's happening on the network?")
-        content.append(self._text_view)
+        scrolled.set_child(self._text_view)
+        content.append(scrolled)
 
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         post_btn = Gtk.Button(label="Post")
