@@ -5,12 +5,17 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gtk
 from .widgets.sidebar import Sidebar
+from .widgets.note_card import NoteCard
 from .views.feed.feed_view import FeedView
+from .views.feed.thread_view import ThreadView
+from .views.feed.note_list import NoteList
 from .views.discover.discover_view import DiscoverView
 from .views.dms.dm_list import DMListView
 from .views.bookmarks.bookmarks_view import BookmarksView
 from .views.relays.relays_view import RelaysView
+from .views.profile.profile_view import ProfileView
 from .views.modals.compose_dialog import ComposeDialog
+from .views.modals.zap_dialog import ZapDialog
 from .views.modals.account_switcher import AccountSwitcherPopover
 from .views.settings.settings_window import SettingsWindow
 from .views.onboarding.import_key_view import ImportKeyView
@@ -44,6 +49,7 @@ class EchoWindow(Adw.ApplicationWindow):
             ("dms", DMListView),
             ("bookmarks", BookmarksView),
             ("relays", RelaysView),
+            ("thread", ThreadView),
         ]:
             if page_cls is FeedView:
                 page = FeedView(title_text="Following" if name == "following" else "Home")
@@ -66,6 +72,13 @@ class EchoWindow(Adw.ApplicationWindow):
         paned.set_position(240)
 
         self.set_content(paned)
+
+        feed = self._pages.get("feed")
+        if isinstance(feed, FeedView):
+            feed.connect("refresh", self._on_feed_refresh)
+        thread = self._pages.get("thread")
+        if isinstance(thread, ThreadView):
+            thread.connect("back", lambda _: self.content.set_visible_child_name("feed"))
 
         self._connect_default_relays()
 
@@ -105,3 +118,62 @@ class EchoWindow(Adw.ApplicationWindow):
     def _on_import_key_from_switcher(self, _view, key: str):
         if self._key_manager.import_key(key):
             self._key_manager.save_to_keyring()
+
+    def _on_feed_refresh(self, feed):
+        feed.show_loading(True)
+        if self._key_manager.has_key:
+            from nostr_sdk import Filter, Kind, PublicKey
+            from echo.services.nostr_client import NostrClient
+            client = NostrClient()
+            f = Filter().kinds([Kind(1)]).limit(20)
+            client.subscribe(f, self._on_event_received)
+
+    def _on_event_received(self, event):
+        from echo.models.note import Note
+        from echo.models.profile import Profile
+
+        pubkey = event.pubkey().to_hex()
+        profile = Profile(pubkey=pubkey)
+
+        note = Note(
+            id=event.id().to_hex(),
+            pubkey=pubkey,
+            content=event.content(),
+            kind=event.kind().as_u16(),
+            created_at=event.created_at().as_u64(),
+            profile=profile,
+        )
+
+        card = NoteCard(note)
+        card.connect("reply", self._on_note_reply)
+        card.connect("profile-clicked", self._on_note_profile_clicked)
+        card.connect("zap", self._on_note_zap)
+
+        feed = self._pages.get("feed")
+        if isinstance(feed, FeedView):
+            feed.add_note(card)
+            feed.show_loading(False)
+
+    def _on_note_reply(self, card):
+        thread = self._pages.get("thread")
+        if isinstance(thread, ThreadView):
+            if hasattr(card, "_note"):
+                thread.set_root_note(card._note)
+            self.content.set_visible_child_name("thread")
+
+    def _on_note_profile_clicked(self, card, pubkey: str):
+        existing = self._pages.get("profile")
+        if existing is not None:
+            self.content.remove(existing)
+            del self._pages["profile"]
+        profile = self._profile_service.get_cached(pubkey) or None
+        view = ProfileView(profile=profile)
+        self._pages["profile"] = view
+        self.content.add_named(view, "profile")
+        self.content.set_visible_child_name("profile")
+
+    def _on_note_zap(self, card):
+        profile = card._note.profile if hasattr(card, "_note") else None
+        name = profile.name or profile.handle if profile else ""
+        dialog = ZapDialog(self, recipient_name=name)
+        dialog.present()

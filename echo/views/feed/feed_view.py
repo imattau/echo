@@ -3,6 +3,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 
 from gi.repository import Gtk, GObject
+from .note_list import NoteList
 
 
 class FeedView(Gtk.Box):
@@ -24,6 +25,7 @@ class FeedView(Gtk.Box):
         title.set_hexpand(True)
 
         refresh_btn = Gtk.Button(label="↻")
+        refresh_btn.set_tooltip_text("Refresh feed")
         refresh_btn.connect("clicked", lambda _: self.emit("refresh"))
         header.append(title)
         header.append(refresh_btn)
@@ -32,10 +34,42 @@ class FeedView(Gtk.Box):
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_vexpand(True)
 
-        self._note_list = Gtk.ListBox()
-        self._note_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._note_list = NoteList()
+        self._note_list.set_row_spacing(8)
         scrolled.set_child(self._note_list)
         self.append(scrolled)
 
+        self._empty_state = Gtk.Label(label="No notes yet.\nConnect relays and refresh to load your feed.")
+        self._empty_state.set_halign(Gtk.Align.CENTER)
+        self._empty_state.set_valign(Gtk.Align.CENTER)
+        self._empty_state.set_margin_top(48)
+        self._empty_state.set_visible(False)
+        self.append(self._empty_state)
+
+        self._spinner = Gtk.Spinner()
+        self._spinner.set_halign(Gtk.Align.CENTER)
+        self._spinner.set_valign(Gtk.Align.CENTER)
+        self._spinner.set_margin_top(48)
+        self._spinner.set_visible(False)
+        self.append(self._spinner)
+
     def add_note(self, note_card):
-        self._note_list.append(note_card)
+        self._note_list.add_note(note_card)
+        self._update_state()
+
+    def clear(self):
+        self._note_list.clear()
+        self._update_state()
+
+    def show_loading(self, loading=True):
+        self._spinner.set_visible(loading)
+        if loading:
+            self._spinner.start()
+        else:
+            self._spinner.stop()
+        self._update_state()
+
+    def _update_state(self):
+        has_notes = self._note_list.get_first_child() is not None
+        self._empty_state.set_visible(not has_notes and not self._spinner.get_visible())
+        self._note_list.set_visible(has_notes)
