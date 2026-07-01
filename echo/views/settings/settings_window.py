@@ -20,6 +20,9 @@ class SettingsWindow(Adw.Window):
         sidebar.add_css_class("sidebar")
 
         prefs_label = Gtk.Label(label="PREFERENCES")
+        prefs_label.set_margin_start(12)
+        prefs_label.set_margin_top(16)
+        prefs_label.set_margin_bottom(8)
         sidebar.append(prefs_label)
 
         items = [
@@ -49,15 +52,20 @@ class SettingsWindow(Adw.Window):
             "Notifications": NotificationsPage(),
         }
 
+        self._nav_buttons = {}
         for i, name in enumerate(items):
             btn = Gtk.Button(label=name)
             btn.set_halign(Gtk.Align.START)
+            btn.set_margin_start(8)
+            btn.set_margin_end(8)
             page = pages.get(name)
             if page:
                 self._stack.add_named(page, name.lower())
                 if i == 0:
                     self._stack.set_visible_child_name(name.lower())
-            btn.connect("clicked", self._on_nav, name.lower())
+                    self._set_active(btn)
+            btn.connect("clicked", self._on_nav, btn, name.lower())
+            self._nav_buttons[name.lower()] = btn
             sidebar.append(btn)
 
         nav.append(sidebar)
@@ -65,5 +73,15 @@ class SettingsWindow(Adw.Window):
 
         self.set_content(nav)
 
+    def _set_active(self, active_btn):
+        for btn in self._nav_buttons.values():
+            if btn is active_btn:
+                if "nav-active" not in btn.get_css_classes():
+                    btn.add_css_class("nav-active")
+            else:
+                if "nav-active" in btn.get_css_classes():
+                    btn.remove_css_class("nav-active")
+
     def _on_nav(self, btn, page_name: str):
+        self._set_active(btn)
         self._stack.set_visible_child_name(page_name)
