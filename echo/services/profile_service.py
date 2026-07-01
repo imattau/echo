@@ -2,7 +2,7 @@ import json
 from typing import Callable, Optional
 
 from datetime import timedelta
-from nostr_sdk import Client, Filter, Kind, PublicKey, Event, ReqTarget
+from nostr_sdk import Client, Filter, Kind, PublicKey, Event
 from echo.models.profile import Profile
 from .async_bridge import AsyncBridge
 
@@ -19,8 +19,7 @@ class ProfileService:
     async def _do_fetch(self, pubkey: str, callback: Optional[Callable] = None):
         public_key = PublicKey.parse(pubkey)
         f = Filter().kinds([Kind(0)]).authors([public_key]).limit(1)
-        target = ReqTarget.auto([f])
-        events = await self._client.fetch_events(target, timedelta(seconds=10))
+        events = await self._client.fetch_events(f, timedelta(seconds=10))
         for event in events.to_vec():
             profile = self._parse_profile(pubkey, event)
             if profile:

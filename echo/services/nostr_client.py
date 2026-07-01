@@ -1,7 +1,7 @@
 from typing import Callable, Optional
 
 from datetime import timedelta
-from nostr_sdk import Client, Filter, Kind, PublicKey, Event, RelayUrl, ReqTarget
+from nostr_sdk import Client, Filter, Kind, PublicKey, Event, RelayUrl
 from .async_bridge import AsyncBridge
 
 
@@ -31,13 +31,12 @@ class NostrClient:
     def publish_event(self, event):
         self._bridge.run(self._client.send_event(event))
 
-    def subscribe(self, filters: Filter, callback: Callable, sub_id: str = "") -> str:
-        self._bridge.run(self._do_subscribe(filters, callback, sub_id))
+    def subscribe(self, filters: Filter, callback: Callable, sub_id: str = ""):
+        self._bridge.run(self._do_subscribe(filters, callback))
         return sub_id
 
-    async def _do_subscribe(self, filters: Filter, callback: Callable, sub_id: str):
-        target = ReqTarget.auto([filters])
-        events = await self._client.fetch_events(target, timedelta(seconds=10))
+    async def _do_subscribe(self, filters: Filter, callback: Callable):
+        events = await self._client.fetch_events(filters, timedelta(seconds=10))
         for event in events.to_vec():
             self._bridge.idle_add(callback, event)
 

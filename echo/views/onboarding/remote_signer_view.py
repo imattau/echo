@@ -31,17 +31,45 @@ class RemoteSignerView(Gtk.Box):
         title.set_css_classes(["welcome-title"])
         content.append(title)
 
+        desc = Gtk.Label(label="Enter a Nostr Connect bunker:// URI from your remote signer app")
+        desc.set_wrap(True)
+        desc.set_max_width_chars(50)
+        content.append(desc)
+
         self._entry = Gtk.Entry()
         self._entry.set_placeholder_text("bunker://...")
         self._entry.set_width_chars(50)
+        self._entry.connect("changed", self._on_entry_changed)
         content.append(self._entry)
 
-        connect_btn = Gtk.Button(label="Connect")
-        connect_btn.add_css_class("suggested-action")
-        connect_btn.connect("clicked", self._on_connect)
-        content.append(connect_btn)
+        self._error_label = Gtk.Label(label="")
+        self._error_label.add_css_class("error-text")
+        self._error_label.set_halign(Gtk.Align.START)
+        self._error_label.set_visible(False)
+        content.append(self._error_label)
+
+        self._connect_btn = Gtk.Button(label="Connect")
+        self._connect_btn.add_css_class("suggested-action")
+        self._connect_btn.set_sensitive(False)
+        self._connect_btn.connect("clicked", self._on_connect)
+        content.append(self._connect_btn)
 
         self.append(content)
+
+    def _on_entry_changed(self, entry):
+        url = entry.get_text().strip()
+        if not url:
+            self._error_label.set_visible(False)
+            self._connect_btn.set_sensitive(False)
+            return
+        valid = url.startswith("bunker://")
+        if not valid:
+            self._error_label.set_label("Invalid URL. Must start with bunker://")
+            self._error_label.set_visible(True)
+            self._connect_btn.set_sensitive(False)
+        else:
+            self._error_label.set_visible(False)
+            self._connect_btn.set_sensitive(True)
 
     def _on_connect(self, _btn):
         url = self._entry.get_text().strip()

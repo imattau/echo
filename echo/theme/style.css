@@ -191,6 +191,11 @@
     color: @error_color;
 }
 
+.error-text {
+    color: @error_color;
+    font-size: 13px;
+}
+
 .resize-handle {
     background-color: @borders;
     border-radius: 3px;

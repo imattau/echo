@@ -11,7 +11,7 @@ class BackupKeyView(Gtk.Box):
         "continue": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
-    def __init__(self):
+    def __init__(self, nsec="", npub=""):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
         back_btn = Gtk.Button(label="‹ Back")
@@ -36,9 +36,45 @@ class BackupKeyView(Gtk.Box):
         warning.set_max_width_chars(50)
         content.append(warning)
 
-        confirm_btn = Gtk.Button(label="Continue to Echo")
+        nsec_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        nsec_box.set_margin_top(8)
+        nsec_box.set_margin_bottom(8)
+
+        nsec_label = Gtk.Label(label="Your private key (nsec)")
+        nsec_label.set_halign(Gtk.Align.START)
+        nsec_box.append(nsec_label)
+
+        self._nsec_entry = Gtk.Entry()
+        self._nsec_entry.set_text(nsec)
+        self._nsec_entry.set_width_chars(60)
+        self._nsec_entry.set_visibility(False)
+        self._nsec_entry.set_editable(False)
+        nsec_box.append(self._nsec_entry)
+
+        reveal_btn = Gtk.Button(label="Reveal")
+        reveal_btn.set_halign(Gtk.Align.START)
+        reveal_btn.connect("clicked", self._on_reveal)
+        nsec_box.append(reveal_btn)
+
+        copy_btn = Gtk.Button(label="Copy to clipboard")
+        copy_btn.set_halign(Gtk.Align.START)
+        copy_btn.connect("clicked", self._on_copy)
+        nsec_box.append(copy_btn)
+
+        content.append(nsec_box)
+
+        confirm_btn = Gtk.Button(label="I've backed up my key — Continue to Echo")
         confirm_btn.add_css_class("suggested-action")
         confirm_btn.connect("clicked", lambda _: self.emit("continue"))
         content.append(confirm_btn)
 
         self.append(content)
+
+    def _on_reveal(self, btn):
+        visible = self._nsec_entry.get_visibility()
+        self._nsec_entry.set_visibility(not visible)
+        btn.set_label("Hide" if not visible else "Reveal")
+
+    def _on_copy(self, btn):
+        clipboard = self.get_clipboard()
+        clipboard.set_text(self._nsec_entry.get_text())

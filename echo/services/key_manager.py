@@ -8,9 +8,17 @@ from echo.utils.config import Config
 
 
 class KeyManager:
+    _instance: Optional["KeyManager"] = None
+
     def __init__(self):
         self._keys: Optional[Keys] = None
         self._key_file = Config.STATE_DIR / "identity.json"
+
+    @classmethod
+    def get(cls) -> "KeyManager":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
     @property
     def has_key(self) -> bool:

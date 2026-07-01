@@ -31,17 +31,45 @@ class ImportKeyView(Gtk.Box):
         title.set_css_classes(["welcome-title"])
         content.append(title)
 
+        desc = Gtk.Label(label="Paste your nsec (starts with nsec1) or hex private key below")
+        desc.set_wrap(True)
+        desc.set_max_width_chars(50)
+        content.append(desc)
+
         self._entry = Gtk.Entry()
-        self._entry.set_placeholder_text("nsec or hex key")
+        self._entry.set_placeholder_text("nsec1... or hex key")
         self._entry.set_width_chars(50)
+        self._entry.connect("changed", self._on_entry_changed)
         content.append(self._entry)
 
-        continue_btn = Gtk.Button(label="Continue to Echo")
-        continue_btn.add_css_class("suggested-action")
-        continue_btn.connect("clicked", self._on_import)
-        content.append(continue_btn)
+        self._error_label = Gtk.Label(label="")
+        self._error_label.add_css_class("error-text")
+        self._error_label.set_halign(Gtk.Align.START)
+        self._error_label.set_visible(False)
+        content.append(self._error_label)
+
+        self._continue_btn = Gtk.Button(label="Continue to Echo")
+        self._continue_btn.add_css_class("suggested-action")
+        self._continue_btn.set_sensitive(False)
+        self._continue_btn.connect("clicked", self._on_import)
+        content.append(self._continue_btn)
 
         self.append(content)
+
+    def _on_entry_changed(self, entry):
+        key = entry.get_text().strip()
+        if not key:
+            self._error_label.set_visible(False)
+            self._continue_btn.set_sensitive(False)
+            return
+        valid = key.startswith("nsec1") or (len(key) == 64 and all(c in "0123456789abcdef" for c in key.lower()))
+        if not valid:
+            self._error_label.set_label("Invalid format. Enter an nsec1... or a 64-character hex key.")
+            self._error_label.set_visible(True)
+            self._continue_btn.set_sensitive(False)
+        else:
+            self._error_label.set_visible(False)
+            self._continue_btn.set_sensitive(True)
 
     def _on_import(self, _btn):
         key = self._entry.get_text().strip()

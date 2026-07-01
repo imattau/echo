@@ -14,13 +14,22 @@ from .views.relays.relays_view import RelaysView
 from .views.profile.profile_view import ProfileView
 from .views.modals.compose_dialog import ComposeDialog
 from .views.modals.account_switcher import AccountSwitcherPopover
+from .views.settings.settings_window import SettingsWindow
+from echo.services.key_manager import KeyManager
+from echo.services.relay_manager import RelayManager
+from echo.services.profile_service import ProfileService
+from echo.utils.config import Config
 
 
 class EchoWindow(Adw.ApplicationWindow):
-    def __init__(self, **kwargs):
+    def __init__(self, key_manager=None, relay_manager=None, **kwargs):
         super().__init__(**kwargs)
         self.set_title("Echo")
         self.set_default_size(1200, 800)
+
+        self._key_manager = key_manager or KeyManager.get()
+        self._relay_manager = relay_manager or RelayManager()
+        self._profile_service = ProfileService()
 
         self.sidebar = Sidebar()
         self.sidebar.set_size_request(240, -1)
@@ -59,8 +68,18 @@ class EchoWindow(Adw.ApplicationWindow):
 
         self.set_content(paned)
 
+        self._connect_default_relays()
+
+    def _connect_default_relays(self):
+        if self._key_manager.has_key:
+            for url in Config.DEFAULT_RELAYS:
+                self._relay_manager.add_relay(url)
+
     def _on_nav_changed(self, _sidebar, page_name: str):
-        if page_name in self._pages:
+        if page_name == "settings":
+            window = SettingsWindow(self)
+            window.present()
+        elif page_name in self._pages:
             self.content.set_visible_child_name(page_name)
 
     def _on_new_note(self, _sidebar):
