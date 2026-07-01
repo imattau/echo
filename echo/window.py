@@ -11,6 +11,7 @@ from .views.feed.thread_view import ThreadView
 from .views.feed.note_list import NoteList
 from .views.discover.discover_view import DiscoverView
 from .views.dms.dm_list import DMListView
+from .views.dms.dm_conversation import DMConversationView
 from .views.bookmarks.bookmarks_view import BookmarksView
 from .views.relays.relays_view import RelaysView
 from .views.profile.profile_view import ProfileView
@@ -47,6 +48,7 @@ class EchoWindow(Adw.ApplicationWindow):
             ("following", FeedView),
             ("discover", DiscoverView),
             ("dms", DMListView),
+            ("dm-conversation", DMConversationView),
             ("bookmarks", BookmarksView),
             ("relays", RelaysView),
             ("thread", ThreadView),
@@ -79,6 +81,15 @@ class EchoWindow(Adw.ApplicationWindow):
         thread = self._pages.get("thread")
         if isinstance(thread, ThreadView):
             thread.connect("back", lambda _: self.content.set_visible_child_name("feed"))
+
+        dms_list = self._pages.get("dms")
+        if isinstance(dms_list, DMListView):
+            dms_list.connect("conversation-selected", self._on_dm_conversation_selected)
+            dms_list.connect("new-conversation", self._on_dm_new_conversation)
+        dm_conv = self._pages.get("dm-conversation")
+        if isinstance(dm_conv, DMConversationView):
+            dm_conv.connect("send-message", self._on_dm_send_message)
+            dm_conv.connect("back", lambda _: self.content.set_visible_child_name("dms"))
 
         self._connect_default_relays()
 
@@ -177,3 +188,80 @@ class EchoWindow(Adw.ApplicationWindow):
         name = profile.name or profile.handle if profile else ""
         dialog = ZapDialog(self, recipient_name=name)
         dialog.present()
+
+    def _on_dm_conversation_selected(self, _list, pubkey: str):
+        conv = self._pages.get("dm-conversation")
+        if not isinstance(conv, DMConversationView):
+            return
+        conv.clear_messages()
+        profile = self._profile_service.get_cached(pubkey)
+        name = profile.handle if profile else ""
+        conv.set_contact(name=name, pubkey=pubkey)
+        self.content.set_visible_child_name("dm-conversation")
+
+    def _on_dm_new_conversation(self, _list):
+        window = Adw.Window(transient_for=self, modal=True)
+        window.set_title("New Conversation")
+        window.set_default_size(400, 200)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
+        content.set_margin_top(16)
+        content.set_margin_bottom(16)
+
+        label = Gtk.Label(label="Enter the recipient's npub or hex public key")
+        label.set_wrap(True)
+        content.append(label)
+
+        entry = Gtk.Entry()
+        entry.set_placeholder_text("npub1... or hex key")
+        entry.set_width_chars(50)
+        content.append(entry)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn.connect("clicked", lambda _: window.close())
+        actions.append(cancel_btn)
+
+        start_btn = Gtk.Button(label="Start conversation")
+        start_btn.add_css_class("suggested-action")
+        start_btn.connect("clicked", lambda _: self._on_dm_start(window, entry))
+        actions.append(start_btn)
+        content.append(actions)
+
+        entry.connect("activate", lambda: self._on_dm_start(window, entry))
+        window.set_content(content)
+        window.present()
+
+    def _on_dm_start(self, window, entry):
+        raw = entry.get_text().strip()
+        if not raw:
+            return
+        from nostr_sdk import PublicKey
+        try:
+            pk = PublicKey.parse(raw)
+            pubkey = pk.to_hex()
+        except Exception:
+            return
+        window.close()
+        conv = self._pages.get("dm-conversation")
+        if isinstance(conv, DMConversationView):
+            conv.clear_messages()
+            conv.set_contact(name="", pubkey=pubkey)
+            self.content.set_visible_child_name("dm-conversation")
+
+    def _on_dm_send_message(self, conv, text: str):
+        if not self._key_manager.has_key:
+            return
+        pubkey = conv._contact_pubkey if hasattr(conv, "_contact_pubkey") else ""
+        if not pubkey:
+            return
+        from nostr_sdk import PublicKey
+        from echo.services.nostr_client import NostrClient
+        try:
+            receiver = PublicKey.parse(pubkey)
+            client = NostrClient()
+            client.send_private_msg(receiver, text)
+        except Exception:
+            pass

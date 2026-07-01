@@ -19,4 +19,17 @@ class DirectMessage:
 
     @property
     def is_sent(self) -> bool:
-        return False
+        from echo.services.key_manager import KeyManager
+        km = KeyManager.get()
+        return km.pubkey == self.pubkey if km.has_key else False
+
+    @property
+    def reply_to(self):
+        for tag in self.tags:
+            if isinstance(tag, (list, tuple)) and len(tag) >= 2 and tag[0] == "p":
+                return tag[1]
+        return None
+
+    @property
+    def mentioned_pubkeys(self):
+        return [tag[1] for tag in self.tags if isinstance(tag, (list, tuple)) and len(tag) >= 2 and tag[0] == "p"]
