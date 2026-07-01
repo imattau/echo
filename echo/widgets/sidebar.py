@@ -70,6 +70,7 @@ class Sidebar(Gtk.Box):
             ("feed", "Home", "go-home-symbolic"),
             ("following", "Following", "people-symbolic"),
             ("discover", "Discover", "edit-find-symbolic"),
+            ("media", "Media", "camera-photo-symbolic"),
             ("dms", "Direct Messages", "mail-symbolic"),
             ("bookmarks", "Bookmarks", "emblem-favorite-symbolic"),
             ("contacts", "Contacts", "system-users-symbolic"),

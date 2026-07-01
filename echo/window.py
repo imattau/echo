@@ -17,6 +17,8 @@ from .views.dms.dm_conversation import DMConversationView
 from .views.bookmarks.bookmarks_view import BookmarksView
 from .views.contacts.contacts_view import ContactsView
 from .views.relays.relays_view import RelaysView
+from .views.media.media_view import MediaView, MediaItem
+from .views.media.lightbox_view import MediaLightbox
 from .views.profile.profile_view import ProfileView
 from .views.modals.compose_dialog import ComposeDialog
 from .views.modals.zap_dialog import ZapDialog
@@ -58,6 +60,7 @@ class EchoWindow(Adw.ApplicationWindow):
             ("contacts", ContactsView),
             ("relays", RelaysView),
             ("thread", ThreadView),
+            ("media", MediaView),
         ]:
             if page_cls is FeedView:
                 page = FeedView(title_text="Following" if name == "following" else "Home")
@@ -113,6 +116,11 @@ class EchoWindow(Adw.ApplicationWindow):
         if isinstance(bookmarks, BookmarksView):
             bookmarks.connect("load", self._on_bookmarks_load)
 
+        media_view = self._pages.get("media")
+        if isinstance(media_view, MediaView):
+            media_view.connect("refresh", self._on_media_refresh)
+            media_view.connect("open-media", self._on_media_open)
+
         contacts = self._pages.get("contacts")
         if isinstance(contacts, ContactsView):
             contacts.connect("load", self._on_contacts_load)
@@ -160,6 +168,10 @@ class EchoWindow(Adw.ApplicationWindow):
             window.present()
         elif page_name in self._pages:
             self.content.set_visible_child_name(page_name)
+        if page_name == "media":
+            media_view = self._pages.get("media")
+            if isinstance(media_view, MediaView):
+                media_view.emit("refresh")
 
     def _on_new_note(self, _sidebar):
         dialog = ComposeDialog(self)
@@ -350,6 +362,79 @@ class EchoWindow(Adw.ApplicationWindow):
         if isinstance(feed, FeedView):
             feed.add_note(card)
             feed.show_loading(False)
+
+    def _on_media_refresh(self, _view):
+        if not self._key_manager.has_key:
+            return
+        media_view = self._pages.get("media")
+        if isinstance(media_view, MediaView):
+            media_view.show_loading(True)
+            media_view.clear()
+        from nostr_sdk import Filter, Kind
+        client = NostrClient()
+        f = Filter().kinds([Kind(1), Kind(20), Kind(21), Kind(22)]).limit(50)
+        client.subscribe(f, self._on_media_event_received)
+
+    def _on_media_event_received(self, event):
+        from echo.models.note import Note
+        from echo.models.profile import Profile
+
+        kind = event.kind().as_u16()
+        pubkey = event.pubkey().to_hex()
+        profile = Profile(pubkey=pubkey)
+
+        note = Note(
+            id=event.id().to_hex(),
+            pubkey=pubkey,
+            content=event.content(),
+            kind=kind,
+            created_at=event.created_at().as_u64(),
+            profile=profile,
+        )
+
+        media_view = self._pages.get("media")
+        if not isinstance(media_view, MediaView):
+            return
+
+        urls: list[str] = []
+
+        if kind == 1:
+            urls = note.media_urls
+            if not urls:
+                return
+            for url in urls:
+                media_type = "video" if any(
+                    url.lower().endswith(ext) for ext in (".mp4", ".webm", ".mov")
+                ) else "image"
+                item = MediaItem(
+                    url=url,
+                    media_type=media_type,
+                    note_id=note.id,
+                    note_content=note.content,
+                    pubkey=pubkey,
+                )
+                media_view.add_media_item(item)
+        else:
+            kind_to_type = {20: "image", 21: "video", 22: "image"}
+            media_type = kind_to_type.get(kind, "image")
+            for tag in event.tags().to_vec():
+                t = tag.as_vec()
+                if len(t) >= 2 and t[0] == "url":
+                    url = t[1]
+                    item = MediaItem(
+                        url=url,
+                        media_type=media_type,
+                        note_id=note.id,
+                        note_content=note.content,
+                        pubkey=pubkey,
+                    )
+                    media_view.add_media_item(item)
+
+        media_view.show_loading(False)
+
+    def _on_media_open(self, _view, items: list, index: int):
+        lightbox = MediaLightbox(self, items, index)
+        lightbox.present()
 
     def _on_note_reply(self, card):
         thread = self._pages.get("thread")

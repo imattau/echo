@@ -7,7 +7,7 @@ from .user_row import UserRow
 from .relay_chip import RelayChip
 from .hashtag_pill import HashtagPill
 from .error_dialog import ErrorDialog, ConfirmDialog, Toast, InlineErrorBanner, OfflineBanner
-from .media_widgets import VideoOverlay, ImagePlaceholder
+from .media_widgets import VideoOverlay, ImagePlaceholder, MediaThumbnail
 from .relay_row import RelayRow
 from .contact_row import ContactRow
 from .resize_handle import ResizeHandle
@@ -28,6 +28,7 @@ __all__ = [
     "OfflineBanner",
     "VideoOverlay",
     "ImagePlaceholder",
+    "MediaThumbnail",
     "RelayRow",
     "ContactRow",
     "ResizeHandle",
