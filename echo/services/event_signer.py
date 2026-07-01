@@ -1,6 +1,6 @@
 from typing import Optional
 
-from nostr_sdk import Keys, EventBuilder, Event, Kind, Tag, PublicKey
+from nostr_sdk import Keys, EventBuilder, Event, Kind, Tag, PublicKey, Contact, RelayUrl
 
 
 class EventSigner:
@@ -16,45 +16,40 @@ class EventSigner:
         return self._keys.public_key().to_bech32()
 
     def sign_text_note(self, content: str, tags: Optional[list[list[str]]] = None) -> Event:
-        builder = EventBuilder.text_note(content, tags or [])
+        builder = EventBuilder.text_note(content)
+        if tags:
+            builder = builder.tags([Tag.parse(t) for t in tags])
         return builder.sign_with_keys(self._keys)
 
     def sign_metadata(self, metadata: dict) -> Event:
-        kind0_kind = Kind(0)
-        builder = EventBuilder(kind0_kind, str(metadata))
+        builder = EventBuilder(Kind(0), str(metadata))
         return builder.sign_with_keys(self._keys)
 
-    def sign_reaction(self, event_id: str, pubkey: str, emoji: str = "+") -> Event:
-        tags = [
-            ["e", event_id],
-            ["p", pubkey],
-        ]
-        builder = EventBuilder.reaction(emoji, tags)
+    def sign_reaction(self, event: Event, emoji: str = "+") -> Event:
+        builder = EventBuilder.reaction(event, emoji)
         return builder.sign_with_keys(self._keys)
 
-    def sign_repost(self, event_id: str, pubkey: str) -> Event:
-        tags = [
-            ["e", event_id],
-            ["p", pubkey],
-        ]
-        kind6 = Kind(6)
-        builder = EventBuilder(kind6, "", tags)
+    def sign_repost(self, event: Event) -> Event:
+        builder = EventBuilder.repost(event, None)
         return builder.sign_with_keys(self._keys)
 
     def sign_delete(self, event_ids: list[str]) -> Event:
-        kind5 = Kind(5)
-        tags = [["e", eid] for eid in event_ids]
-        builder = EventBuilder(kind5, "", tags)
+        builder = EventBuilder.text_note("deleting")
+        tags = [Tag.parse(["e", eid]) for eid in event_ids]
+        builder = builder.tags(tags)
         return builder.sign_with_keys(self._keys)
 
     def sign_contact_list(self, contacts: list[tuple[str, str, str]]) -> Event:
-        kind3 = Kind(3)
-        tags = [["p", pubkey, relay] for pubkey, relay, _ in contacts]
-        builder = EventBuilder(kind3, "", tags)
+        contact_objects = []
+        for pubkey, relay, _ in contacts:
+            pk = PublicKey.parse(pubkey)
+            rl = RelayUrl.parse(relay) if relay else None
+            contact_objects.append(Contact(public_key=pk, relay_url=rl))
+        builder = EventBuilder.contact_list(contact_objects)
         return builder.sign_with_keys(self._keys)
 
     def sign_bookmarks_list(self, event_ids: list[str]) -> Event:
-        kind10003 = Kind(10003)
-        tags = [["a", f"30023:{eid}:", ""] for eid in event_ids]
-        builder = EventBuilder(kind10003, "", tags)
+        builder = EventBuilder.text_note("bookmarks")
+        tags = [Tag.parse(["a", f"30023:{eid}:", ""]) for eid in event_ids]
+        builder = builder.tags(tags)
         return builder.sign_with_keys(self._keys)

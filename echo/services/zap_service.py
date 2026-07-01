@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Callable, Optional
 
 from nostr_sdk import (
     Keys, EventBuilder, ZapRequestData, PublicKey, RelayUrl,
-    nip57_anonymous_zap_request, NostrWalletConnect,
+    nip57_anonymous_zap_request, Nwc, NostrWalletConnectUri,
 )
 from .async_bridge import AsyncBridge
 
@@ -10,7 +10,7 @@ from .async_bridge import AsyncBridge
 class ZapService:
     def __init__(self):
         self._bridge = AsyncBridge.get()
-        self._nwc: Optional[NostrWalletConnect] = None
+        self._nwc: Optional[Nwc] = None
         self._connected = False
         self._balance = 0
 
@@ -22,19 +22,29 @@ class ZapService:
     def balance(self) -> int:
         return self._balance
 
-    def connect(self, connection_string: str) -> bool:
-        self._bridge.run(self._do_connect(connection_string))
-        return True
+    def connect(self, connection_string: str, callback: Optional[Callable] = None):
+        self._bridge.run(self._do_connect(connection_string, callback))
 
-    async def _do_connect(self, connection_string: str):
+    async def _do_connect(self, connection_string: str, callback: Optional[Callable] = None):
         try:
-            self._nwc = NostrWalletConnect(connection_string)
+            uri = NostrWalletConnectUri.parse(connection_string)
+            self._nwc = Nwc(uri)
             info = await self._nwc.get_info()
             self._connected = True
-            if hasattr(info, "balance"):
-                self._balance = info.balance
-        except Exception:
+            name = info.alias or ""
+            if self._nwc:
+                try:
+                    balance = await self._nwc.get_balance()
+                    self._balance = balance.balance if hasattr(balance, "balance") else 0
+                except Exception:
+                    pass
+            if callback:
+                self._bridge.idle_add(callback, True, name, str(self._balance))
+        except Exception as e:
             self._connected = False
+            self._nwc = None
+            if callback:
+                self._bridge.idle_add(callback, False, str(e), "")
 
     def disconnect(self):
         self._nwc = None
@@ -47,14 +57,16 @@ class ZapService:
 
     async def _do_zap(self, pubkey: str, amount: int, message: str):
         try:
-            if self._nwc:
-                public_key = PublicKey.parse(pubkey)
-                relay_list = [RelayUrl.parse("wss://relay.damus.io")]
-                data = ZapRequestData(public_key, relay_list)
-                if message:
-                    data = data.message(message)
-                zap_event = nip57_anonymous_zap_request(data)
-                await self._nwc.pay_invoice(zap_event, amount * 1000)
+            if not self._nwc:
+                return
+            from nostr_sdk import PayInvoiceRequest
+            recipient_pk = PublicKey.parse(pubkey)
+            relay_list = [RelayUrl.parse("wss://relay.damus.io")]
+            zap_data = ZapRequestData(recipient_pk, relay_list).message(message) if message else ZapRequestData(recipient_pk, relay_list)
+            zap_event = nip57_anonymous_zap_request(zap_data)
+            invoice = zap_event.as_json() if hasattr(zap_event, "as_json") else str(zap_event)
+            request = PayInvoiceRequest(invoice=invoice, amount=amount * 1000)
+            await self._nwc.pay_invoice(request)
         except Exception:
             pass
 

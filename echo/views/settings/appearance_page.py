@@ -60,6 +60,7 @@ class AppearancePage(Gtk.Box):
             return
         settings = Settings.get()
         settings.set_string("theme", theme_key)
+        settings.sync()
         theme_map = {
             "light": Adw.ColorScheme.FORCE_LIGHT,
             "dark": Adw.ColorScheme.FORCE_DARK,

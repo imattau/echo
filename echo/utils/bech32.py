@@ -5,7 +5,7 @@ from nostr_sdk import SecretKey, PublicKey
 
 def nsec_to_hex(nsec: str) -> Optional[str]:
     try:
-        sk = SecretKey.from_bech32(nsec)
+        sk = SecretKey.parse(nsec)
         return sk.to_hex()
     except Exception:
         return None
@@ -13,7 +13,7 @@ def nsec_to_hex(nsec: str) -> Optional[str]:
 
 def npub_to_hex(npub: str) -> Optional[str]:
     try:
-        pk = PublicKey.from_bech32(npub)
+        pk = PublicKey.parse(npub)
         return pk.to_hex()
     except Exception:
         return None
@@ -21,7 +21,7 @@ def npub_to_hex(npub: str) -> Optional[str]:
 
 def hex_to_npub(hex_key: str) -> Optional[str]:
     try:
-        pk = PublicKey.from_hex(hex_key)
+        pk = PublicKey.parse(hex_key)
         return pk.to_bech32()
     except Exception:
         return None
@@ -29,7 +29,7 @@ def hex_to_npub(hex_key: str) -> Optional[str]:
 
 def hex_to_nsec(hex_key: str) -> Optional[str]:
     try:
-        sk = SecretKey.from_hex(hex_key)
+        sk = SecretKey.parse(hex_key)
         return sk.to_bech32()
     except Exception:
         return None

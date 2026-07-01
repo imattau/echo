@@ -102,10 +102,20 @@ class _DictSettingsBackend:
         if initial is not None:
             widget.set_property(prop, initial)
 
+        def _on_widget_changed(*args):
+            self._store[key] = widget.get_property(prop)
+
+        widget.connect(f"notify::{prop}", _on_widget_changed)
+
     def bind_inverted(self, widget, key, prop="active"):
         initial = self._store.get(key, self._DEFAULTS.get(key))
         if initial is not None:
             widget.set_property(prop, not initial)
+
+        def _on_widget_changed(*args):
+            self._store[key] = not widget.get_property(prop)
+
+        widget.connect(f"notify::{prop}", _on_widget_changed)
 
     def connect(self, key, callback):
         pass
@@ -121,9 +131,11 @@ class Settings:
     _instance: Optional["Settings"] = None
 
     def __init__(self):
-        try:
+        schema_source = Gio.SettingsSchemaSource.get_default()
+        schema = schema_source.lookup(Config.APP_ID, True) if schema_source else None
+        if schema is not None:
             self._settings = Gio.Settings(schema_id=Config.APP_ID)
-        except GLib.Error:
+        else:
             self._settings = _DictSettingsBackend()
 
     @classmethod

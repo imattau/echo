@@ -3,8 +3,10 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Gtk, Adw
+from gi.repository import Gtk, Adw, GLib
 from ..relays.relays_view import RelaysPage
+from echo.services.zap_service import ZapService
+from echo.utils.config import Config
 
 
 class SettingsWindow(Adw.Window):
@@ -12,6 +14,8 @@ class SettingsWindow(Adw.Window):
         super().__init__(transient_for=parent, modal=True)
         self.set_title("Preferences")
         self.set_default_size(960, 640)
+
+        self._zap_service = ZapService()
 
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
 
@@ -43,11 +47,15 @@ class SettingsWindow(Adw.Window):
         from .accounts_page import AccountsPage
         from .notifications_page import NotificationsPage
 
+        self._wallet_page = WalletPage()
+        self._wallet_page.connect("connect-wallet", self._on_wallet_connect)
+        self._wallet_page.connect("disconnect-wallet", self._on_wallet_disconnect)
+
         pages = {
             "General": GeneralPage(),
             "Appearance": AppearancePage(),
             "Relays": RelaysPage(),
-            "Wallet": WalletPage(),
+            "Wallet": self._wallet_page,
             "Accounts": AccountsPage(),
             "Notifications": NotificationsPage(),
         }
@@ -85,3 +93,16 @@ class SettingsWindow(Adw.Window):
     def _on_nav(self, btn, page_name: str):
         self._set_active(btn)
         self._stack.set_visible_child_name(page_name)
+
+    def _on_wallet_connect(self, _page, url: str):
+        self._wallet_page.set_connecting(True)
+
+        def _on_result(success: bool, name: str = "", balance: str = ""):
+            GLib.idle_add(self._wallet_page.set_wallet_status, success, name, balance)
+
+        self._zap_service.connect(url, callback=_on_result)
+
+    def _on_wallet_disconnect(self, _page):
+        self._zap_service.disconnect()
+        self._wallet_page.set_wallet_status(connected=False)
+        self._wallet_page._clear_saved_uri()

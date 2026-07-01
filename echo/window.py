@@ -15,6 +15,7 @@ from .views.discover.discover_view import DiscoverView
 from .views.dms.dm_list import DMListView
 from .views.dms.dm_conversation import DMConversationView
 from .views.bookmarks.bookmarks_view import BookmarksView
+from .views.contacts.contacts_view import ContactsView
 from .views.relays.relays_view import RelaysView
 from .views.profile.profile_view import ProfileView
 from .views.modals.compose_dialog import ComposeDialog
@@ -25,6 +26,7 @@ from .views.onboarding.import_key_view import ImportKeyView
 from echo.services.key_manager import KeyManager
 from echo.services.relay_manager import RelayManager
 from echo.services.profile_service import ProfileService
+from echo.services.nostr_client import NostrClient
 from echo.utils.config import Config, Settings
 from echo.widgets.error_dialog import ErrorDialog, ConfirmDialog
 
@@ -53,6 +55,7 @@ class EchoWindow(Adw.ApplicationWindow):
             ("dms", DMListView),
             ("dm-conversation", DMConversationView),
             ("bookmarks", BookmarksView),
+            ("contacts", ContactsView),
             ("relays", RelaysView),
             ("thread", ThreadView),
         ]:
@@ -100,6 +103,26 @@ class EchoWindow(Adw.ApplicationWindow):
         if isinstance(dm_conv, DMConversationView):
             dm_conv.connect("send-message", self._on_dm_send_message)
             dm_conv.connect("back", lambda _: self.content.set_visible_child_name("dms"))
+
+        discover = self._pages.get("discover")
+        if isinstance(discover, DiscoverView):
+            discover.connect("search", self._on_discover_search)
+            discover.connect("trending-tag", self._on_discover_trending_tag)
+
+        bookmarks = self._pages.get("bookmarks")
+        if isinstance(bookmarks, BookmarksView):
+            bookmarks.connect("load", self._on_bookmarks_load)
+
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.connect("load", self._on_contacts_load)
+            contacts.connect("add-contact", self._on_contacts_add)
+            contacts.connect("follow", self._on_contacts_follow)
+            contacts.connect("unfollow", self._on_contacts_unfollow)
+            contacts.connect("mute", self._on_contacts_mute)
+            contacts.connect("unmute", self._on_contacts_unmute)
+            contacts.connect("block", self._on_contacts_block)
+            contacts.connect("unblock", self._on_contacts_unblock)
 
         self._connect_default_relays()
 
@@ -197,10 +220,110 @@ class EchoWindow(Adw.ApplicationWindow):
         feed.show_loading(True)
         if self._key_manager.has_key:
             from nostr_sdk import Filter, Kind, PublicKey
-            from echo.services.nostr_client import NostrClient
             client = NostrClient()
             f = Filter().kinds([Kind(1)]).limit(20)
             client.subscribe(f, self._on_event_received)
+
+    def _on_discover_search(self, _page, query: str):
+        if not self._key_manager.has_key:
+            return
+        from nostr_sdk import Filter, Kind
+        client = NostrClient()
+        f = Filter().kinds([Kind(1)]).search(query).limit(50)
+        client.subscribe(f, self._on_discover_result)
+
+    def _on_discover_trending_tag(self, _page, tag: str):
+        if not self._key_manager.has_key:
+            return
+        from nostr_sdk import Filter, Kind
+        client = NostrClient()
+        f = Filter().kinds([Kind(1)]).hashtag(tag.lstrip("#")).limit(50)
+        client.subscribe(f, self._on_discover_result)
+
+    def _on_discover_result(self, event):
+        from echo.models.note import Note
+        from echo.models.profile import Profile
+
+        pubkey = event.pubkey().to_hex()
+        profile = Profile(pubkey=pubkey)
+
+        note = Note(
+            id=event.id().to_hex(),
+            pubkey=pubkey,
+            content=event.content(),
+            kind=event.kind().as_u16(),
+            created_at=event.created_at().as_u64(),
+            profile=profile,
+        )
+
+        card = NoteCard(note)
+        card.connect("reply", self._on_note_reply)
+        card.connect("profile-clicked", self._on_note_profile_clicked)
+        card.connect("zap", self._on_note_zap)
+
+        discover = self._pages.get("discover")
+        if isinstance(discover, DiscoverView):
+            discover.add_result(card)
+
+    def _on_bookmarks_load(self, _page):
+        if not self._key_manager.has_key:
+            return
+        bookmarks = self._pages.get("bookmarks")
+        if isinstance(bookmarks, BookmarksView):
+            bookmarks.show_loading(True)
+            bookmarks.clear()
+        from nostr_sdk import Filter, Kind, PublicKey
+        client = NostrClient()
+        pk = self._key_manager.pubkey
+        if pk:
+            pubkey = PublicKey.parse(pk)
+            f = Filter().kinds([Kind(34)]).authors([pubkey]).limit(10)
+            client.subscribe(f, self._on_bookmarks_list_received)
+
+    def _on_bookmarks_list_received(self, event):
+        from nostr_sdk import EventId, Filter
+        ids = []
+        for tag in event.tags().to_vec():
+            t = tag.as_vec()
+            if len(t) >= 2 and t[0] == "e":
+                try:
+                    ids.append(EventId.parse(t[1]))
+                except Exception:
+                    pass
+        if ids:
+            f = Filter().ids(ids).limit(50)
+            client = NostrClient()
+            client.subscribe(f, self._on_bookmark_event_received)
+        else:
+            bookmarks = self._pages.get("bookmarks")
+            if isinstance(bookmarks, BookmarksView):
+                bookmarks.show_loading(False)
+
+    def _on_bookmark_event_received(self, event):
+        from echo.models.note import Note
+        from echo.models.profile import Profile
+
+        pubkey = event.pubkey().to_hex()
+        profile = Profile(pubkey=pubkey)
+
+        note = Note(
+            id=event.id().to_hex(),
+            pubkey=pubkey,
+            content=event.content(),
+            kind=event.kind().as_u16(),
+            created_at=event.created_at().as_u64(),
+            profile=profile,
+        )
+
+        card = NoteCard(note)
+        card.connect("reply", self._on_note_reply)
+        card.connect("profile-clicked", self._on_note_profile_clicked)
+        card.connect("zap", self._on_note_zap)
+
+        bookmarks = self._pages.get("bookmarks")
+        if isinstance(bookmarks, BookmarksView):
+            bookmarks.add_bookmark(card)
+            bookmarks.show_loading(False)
 
     def _on_event_received(self, event):
         from echo.models.note import Note
@@ -348,3 +471,182 @@ class EchoWindow(Adw.ApplicationWindow):
             client.send_private_msg(receiver, text)
         except Exception:
             pass
+
+    def _on_contacts_load(self, _view):
+        if not self._key_manager.has_key:
+            return
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.clear()
+            contacts.show_loading(True)
+        from nostr_sdk import Filter, Kind, PublicKey
+        client = NostrClient()
+        pk = self._key_manager.pubkey
+        if pk:
+            pubkey = PublicKey.parse(pk)
+            f = Filter().kinds([Kind(3)]).authors([pubkey]).limit(1)
+            client.subscribe(f, self._on_contact_list_received)
+            mute_f = Filter().kinds([Kind(10000)]).authors([pubkey]).limit(1)
+            client.subscribe(mute_f, self._on_mute_list_received)
+
+    def _on_contact_list_received(self, event):
+        contact_pubkeys = []
+        for tag in event.tags().to_vec():
+            t = tag.as_vec()
+            if len(t) >= 2 and t[0] == "p":
+                contact_pubkeys.append(t[1])
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_following(set(contact_pubkeys))
+        for pk in contact_pubkeys:
+            self._profile_service.fetch_profile(pk, self._on_contact_profile_received)
+
+    def _on_contact_profile_received(self, profile):
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.add_profile(profile)
+            contacts.show_loading(False)
+
+    def _on_mute_list_received(self, event):
+        muted = set()
+        for tag in event.tags().to_vec():
+            t = tag.as_vec()
+            if len(t) >= 2 and t[0] == "p":
+                muted.add(t[1])
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_muted(muted)
+
+    def _on_contacts_add(self, _view):
+        window = Adw.Window(transient_for=self, modal=True)
+        window.set_title("Add Contact")
+        window.set_default_size(400, 200)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
+        content.set_margin_top(16)
+        content.set_margin_bottom(16)
+
+        label = Gtk.Label(label="Enter the npub or hex public key of the contact to add")
+        label.set_wrap(True)
+        content.append(label)
+
+        entry = Gtk.Entry()
+        entry.set_placeholder_text("npub1... or hex key")
+        entry.set_width_chars(50)
+        content.append(entry)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn.connect("clicked", lambda _: window.close())
+        actions.append(cancel_btn)
+
+        add_btn = Gtk.Button(label="Add Contact")
+        add_btn.add_css_class("suggested-action")
+        add_btn.connect("clicked", lambda _: self._on_contacts_add_submit(window, entry))
+        actions.append(add_btn)
+        content.append(actions)
+
+        entry.connect("activate", lambda: self._on_contacts_add_submit(window, entry))
+        window.set_content(content)
+        window.present()
+
+    def _on_contacts_add_submit(self, window, entry):
+        raw = entry.get_text().strip()
+        if not raw:
+            return
+        from nostr_sdk import PublicKey
+        try:
+            pk = PublicKey.parse(raw)
+            pubkey = pk.to_hex()
+        except Exception:
+            return
+        window.close()
+        contact_pubkeys = set()
+        contacts_view = self._pages.get("contacts")
+        if isinstance(contacts_view, ContactsView):
+            contact_pubkeys = set(contacts_view._following)
+        contact_pubkeys.add(pubkey)
+        self._publish_contact_list(contact_pubkeys)
+        self._profile_service.fetch_profile(pubkey, self._on_contact_profile_received)
+
+    def _on_contacts_follow(self, _view, pubkey: str):
+        contacts_view = self._pages.get("contacts")
+        if not isinstance(contacts_view, ContactsView):
+            return
+        following = set(contacts_view._following)
+        following.add(pubkey)
+        self._publish_contact_list(following)
+
+    def _on_contacts_unfollow(self, _view, pubkey: str):
+        contacts_view = self._pages.get("contacts")
+        if not isinstance(contacts_view, ContactsView):
+            return
+        following = set(contacts_view._following)
+        following.discard(pubkey)
+        self._publish_contact_list(following)
+
+    def _publish_contact_list(self, pubkeys: set[str]):
+        if not self._key_manager.has_key:
+            return
+        from echo.services.event_signer import EventSigner
+        from echo.services.nostr_client import NostrClient
+        contacts_with_relays = [(pk, "", "") for pk in pubkeys]
+        try:
+            keys = self._key_manager.keys
+            signer = EventSigner(keys)
+            event = signer.sign_contact_list(contacts_with_relays)
+            client = NostrClient()
+            client.publish_event(event)
+        except Exception:
+            pass
+
+    def _on_contacts_mute(self, _view, pubkey: str):
+        contacts_view = self._pages.get("contacts")
+        if not isinstance(contacts_view, ContactsView):
+            return
+        muted = set(contacts_view._muted)
+        muted.add(pubkey)
+        contacts_view.set_muted(muted)
+        self._publish_mute_list(muted)
+
+    def _on_contacts_unmute(self, _view, pubkey: str):
+        contacts_view = self._pages.get("contacts")
+        if not isinstance(contacts_view, ContactsView):
+            return
+        muted = set(contacts_view._muted)
+        muted.discard(pubkey)
+        contacts_view.set_muted(muted)
+        self._publish_mute_list(muted)
+
+    def _publish_mute_list(self, muted: set[str]):
+        if not self._key_manager.has_key:
+            return
+        from nostr_sdk import Kind, Tag, EventBuilder
+        from echo.services.nostr_client import NostrClient
+        try:
+            keys = self._key_manager.keys
+            tags = [Tag.parse(["p", pk]) for pk in muted]
+            builder = EventBuilder(Kind(10000), "").tags(tags)
+            event = builder.sign_with_keys(keys)
+            client = NostrClient()
+            client.publish_event(event)
+        except Exception:
+            pass
+
+    def _on_contacts_block(self, _view, pubkey: str):
+        contacts_view = self._pages.get("contacts")
+        if not isinstance(contacts_view, ContactsView):
+            return
+        blocked = set(contacts_view._blocked)
+        blocked.add(pubkey)
+        contacts_view.set_blocked(blocked)
+
+    def _on_contacts_unblock(self, _view, pubkey: str):
+        contacts_view = self._pages.get("contacts")
+        if not isinstance(contacts_view, ContactsView):
+            return
+        blocked = set(contacts_view._blocked)
+        blocked.discard(pubkey)
+        contacts_view.set_blocked(blocked)

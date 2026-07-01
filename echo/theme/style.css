@@ -95,6 +95,125 @@
     background-color: @error_color;
 }
 
+.contacts-nav-panel {
+    background-color: @theme_bg_color;
+    border-right: 1px solid @borders;
+}
+
+.contacts-nav-header {
+    font-weight: 600;
+    font-size: 10px;
+    color: @insensitive_fg_color;
+    letter-spacing: 0.5px;
+}
+
+.contacts-nav-item-text {
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.contacts-nav-count {
+    font-size: 11px;
+    color: @insensitive_fg_color;
+}
+
+.contacts-nav-active {
+    background-color: alpha(@accent_bg_color, 0.15);
+    border-radius: 8px;
+}
+
+.contacts-title {
+    font-weight: 700;
+    font-size: 22px;
+}
+
+.contacts-search {
+    background-color: @theme_base_color;
+    border: 1px solid @borders;
+    border-radius: 10px;
+    padding: 6px 14px;
+}
+
+.contacts-list {
+    background-color: @card_bg_color;
+    border: 1px solid @borders;
+    border-radius: 12px;
+    margin-left: 32px;
+    margin-right: 32px;
+}
+
+.contact-row {
+    border-bottom: 1px solid @borders;
+}
+
+.contact-name {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.contact-handle {
+    font-size: 11px;
+    color: @insensitive_fg_color;
+}
+
+.contact-badge {
+    border-radius: 999px;
+    padding: 2px 6px;
+}
+
+.contact-badge-follows {
+    background-color: alpha(@success_color, 0.15);
+}
+
+.contact-badge-muted {
+    background-color: alpha(@error_color, 0.12);
+}
+
+.contact-badge-label {
+    font-weight: 600;
+    font-size: 9px;
+}
+
+.contact-badge-follows .contact-badge-label {
+    color: @success_color;
+}
+
+.contact-badge-muted .contact-badge-label {
+    color: @error_color;
+}
+
+.contact-bio {
+    font-size: 11px;
+    color: @insensitive_fg_color;
+}
+
+.contact-action-btn {
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.contact-action-btn-following {
+    background-color: transparent;
+    border: 1px solid @borders;
+    color: @theme_fg_color;
+}
+
+.contact-menu-btn {
+    background-color: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    color: @insensitive_fg_color;
+    padding: 4px 8px;
+}
+
+.contacts-empty {
+    font-size: 14px;
+    color: @insensitive_fg_color;
+}
+
 .unread-dot {
     min-width: 8px;
     min-height: 8px;

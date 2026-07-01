@@ -72,6 +72,7 @@ class Sidebar(Gtk.Box):
             ("discover", "Discover", "edit-find-symbolic"),
             ("dms", "Direct Messages", "mail-symbolic"),
             ("bookmarks", "Bookmarks", "emblem-favorite-symbolic"),
+            ("contacts", "Contacts", "system-users-symbolic"),
             ("relays", "Relays", "network-server-symbolic"),
             ("settings", "Settings", "emblem-system-symbolic"),
         ]
