@@ -1,0 +1,183 @@
+.sidebar {
+    background-color: #ECECEC;
+    border-right: 1px solid #E0E0E0;
+}
+
+.app-title {
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.new-note-button {
+    background-color: #3584E4;
+    color: #FFFFFF;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 14px;
+}
+
+.note-card {
+    background-color: #FFFFFF;
+    border-radius: 12px;
+    border: 1px solid #E0E0E0;
+}
+
+.engagement-button {
+    background-color: #EDEDED;
+    border-radius: 8px;
+    padding: 6px 12px;
+}
+
+.zap-button {
+    background-color: #FAEBC7;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #E0991A;
+}
+
+.zap-text {
+    color: #E0991A;
+    font-weight: 600;
+}
+
+.relay-chip {
+    background-color: #E7EEFB;
+    border-radius: 999px;
+    padding: 4px 10px;
+}
+
+.relay-chip-text {
+    color: #3584E4;
+    font-weight: 600;
+    font-size: 10px;
+}
+
+.status-dot {
+    min-width: 9px;
+    min-height: 9px;
+    border-radius: 999px;
+}
+
+.status-connected {
+    background-color: #40A659;
+}
+
+.status-slow {
+    background-color: #D99926;
+}
+
+.status-disconnected {
+    background-color: #CC4D4D;
+}
+
+.unread-dot {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 999px;
+    background-color: #3584E4;
+}
+
+.trending-pill {
+    background-color: #EDEDED;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.app-emblem {
+    font-size: 48px;
+}
+
+.welcome-title {
+    font-weight: 700;
+    font-size: 24px;
+    color: #1C1C1C;
+}
+
+.settings-title {
+    font-weight: 700;
+    font-size: 22px;
+    color: #1C1C1C;
+}
+
+.profile-banner {
+    background-color: #CCDBF0;
+}
+
+.profile-avatar {
+    background-color: #FFFFFF;
+    border-radius: 48px;
+}
+
+.profile-name {
+    font-weight: 700;
+    font-size: 20px;
+}
+
+.stat-count {
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.stat-label {
+    color: #737373;
+    font-size: 13px;
+}
+
+.video-overlay {
+    background-color: #292E38;
+    border-radius: 10px;
+}
+
+.duration-badge {
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 5px;
+    padding: 3px 7px;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.image-placeholder {
+    background-color: #CCDBF0;
+    border-radius: 10px;
+}
+
+.toast {
+    background-color: #262629;
+    border-radius: 10px;
+    padding: 10px 16px;
+    color: #FFFFFF;
+}
+
+.error-banner {
+    background-color: #FAE8E8;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.offline-banner {
+    background-color: #FDF0DA;
+    border-radius: 10px;
+    padding: 10px 16px;
+}
+
+.dialog-title {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.error-icon {
+    font-size: 30px;
+    color: #CC4D4D;
+}
+
+.resize-handle {
+    background-color: #D9D9D9;
+    border-radius: 3px;
+    padding: 10px 0px;
+}
+
+.resize-dot {
+    background-color: #999999;
+    border-radius: 999px;
+}
