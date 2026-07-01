@@ -6,6 +6,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, Gtk, Gdk
 from .window import EchoWindow
 from .services.key_manager import KeyManager
+from .utils.config import Settings
 from .views.onboarding.controller import OnboardingController
 from pathlib import Path
 
@@ -32,10 +33,12 @@ class EchoApplication(Adw.Application):
     def on_activate(self, *args):
         win = self.props.active_window
         if not win:
+            settings = Settings.get()
             key_manager = KeyManager.get()
             has_identity = key_manager.load_from_keyring()
+            onboarding_done = settings.get_bool("onboarding-completed")
 
-            if has_identity:
+            if has_identity and onboarding_done:
                 win = EchoWindow(application=self, key_manager=key_manager)
             else:
                 win = OnboardingController()

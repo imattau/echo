@@ -68,6 +68,11 @@
       <default>true</default>
       <summary>Show notifications for direct messages</summary>
     </key>
+    <key name="onboarding-completed" type="b">
+      <default>false</default>
+      <summary>Whether the user has completed the onboarding wizard</summary>
+    </key>
+
     <key name="notify-sound" type="b">
       <default>false</default>
       <summary>Play a sound for notifications</summary>

@@ -63,6 +63,7 @@ class _DictSettingsBackend:
         "default-zap-amount": 500,
         "auto-zap-on-like": False,
         "skip-zap-confirmation-under": 1000,
+        "onboarding-completed": False,
         "notify-replies": True,
         "notify-zaps": True,
         "notify-dms": True,

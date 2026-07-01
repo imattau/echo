@@ -10,7 +10,7 @@ from .backup_key_view import BackupKeyView
 from .remote_signer_view import RemoteSignerView
 from echo.services.key_manager import KeyManager
 from echo.services.relay_manager import RelayManager
-from echo.utils.config import Config
+from echo.utils.config import Config, Settings
 
 
 class OnboardingController(Adw.Window):
@@ -94,5 +94,6 @@ class OnboardingController(Adw.Window):
             self._relay_manager.add_relay(url)
 
     def _finish(self):
+        Settings.get().set_bool("onboarding-completed", True)
         self.emit("done")
         self.close()
