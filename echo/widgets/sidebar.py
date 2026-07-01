@@ -72,7 +72,16 @@ class Sidebar(Gtk.Box):
         box.set_margin_top(8)
         box.set_margin_bottom(8)
 
-        icon = Gtk.Image.new_from_icon_name(f"echo-{name}-symbolic")
+        icon_names = {
+            "feed": "go-home-symbolic",
+            "following": "people-symbolic",
+            "discover": "edit-find-symbolic",
+            "dms": "mail-symbolic",
+            "bookmarks": "emblem-favorite-symbolic",
+            "relays": "network-server-symbolic",
+        }
+        icon_name = icon_names.get(name, "view-list-symbolic")
+        icon = Gtk.Image.new_from_icon_name(icon_name)
         icon.set_pixel_size(16)
 
         text = Gtk.Label(label=label)
