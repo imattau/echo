@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="com.echo.nostr" path="/com/echo/nostr/">
+
+    <key name="open-to-following-feed" type="b">
+      <default>false</default>
+      <summary>Open to Following feed on startup</summary>
+    </key>
+    <key name="restore-last-window-state" type="b">
+      <default>true</default>
+      <summary>Restore the last window size and position</summary>
+    </key>
+    <key name="confirm-before-posting" type="b">
+      <default>false</default>
+      <summary>Show a confirmation dialog before publishing notes</summary>
+    </key>
+    <key name="default-relays" type="as">
+      <default>['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band', 'wss://relay.snort.social']</default>
+      <summary>Default list of relay URLs to connect to</summary>
+    </key>
+
+    <key name="theme" type="s">
+      <default>'system'</default>
+      <summary>Color scheme: light, dark, or follow system preference</summary>
+    </key>
+    <key name="accent-color" type="s">
+      <default>'#3584E4'</default>
+      <summary>Accent color for the UI (hex)</summary>
+    </key>
+    <key name="compact-mode" type="b">
+      <default>false</default>
+      <summary>Use compact spacing in the feed</summary>
+    </key>
+    <key name="show-media-previews" type="b">
+      <default>true</default>
+      <summary>Show image and video previews inline in notes</summary>
+    </key>
+
+    <key name="language" type="s">
+      <default>'en-AU'</default>
+      <summary>Display language locale</summary>
+    </key>
+
+    <key name="default-zap-amount" type="i">
+      <default>500</default>
+      <range min="1" max="1000000"/>
+      <summary>Default zap amount in sats</summary>
+    </key>
+    <key name="auto-zap-on-like" type="b">
+      <default>false</default>
+      <summary>Automatically zap when liking a note</summary>
+    </key>
+    <key name="skip-zap-confirmation-under" type="i">
+      <default>1000</default>
+      <range min="0" max="1000000"/>
+      <summary>Skip zap confirmation for amounts under this threshold (sats)</summary>
+    </key>
+
+    <key name="notify-replies" type="b">
+      <default>true</default>
+      <summary>Show notifications for replies</summary>
+    </key>
+    <key name="notify-zaps" type="b">
+      <default>true</default>
+      <summary>Show notifications for zaps</summary>
+    </key>
+    <key name="notify-dms" type="b">
+      <default>true</default>
+      <summary>Show notifications for direct messages</summary>
+    </key>
+    <key name="notify-sound" type="b">
+      <default>false</default>
+      <summary>Play a sound for notifications</summary>
+    </key>
+
+  </schema>
+</schemalist>

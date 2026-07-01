@@ -12,6 +12,8 @@ license = {text = "MIT"}
 
 dependencies = [
     "PyGObject>=3.42",
+    "nostr-sdk>=0.44.2",
+    "secretstorage>=3.3",
 ]
 
 [project.scripts]
