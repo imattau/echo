@@ -1,19 +1,19 @@
 import gi
 
 gi.require_version("Gtk", "4.0")
-gi.require_version("Adw", "1")
 
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Gtk, GLib
 from ..relays.relays_view import RelaysPage
 from echo.services.zap_service import ZapService
 from echo.utils.config import Config
 
 
-class SettingsWindow(Adw.Window):
+class SettingsWindow(Gtk.Window):
     def __init__(self, parent):
         super().__init__(transient_for=parent, modal=True)
         self.set_title("Preferences")
         self.set_default_size(960, 640)
+        self.set_titlebar(Gtk.HeaderBar())
 
         self._zap_service = ZapService()
 
@@ -72,14 +72,14 @@ class SettingsWindow(Adw.Window):
                 if i == 0:
                     self._stack.set_visible_child_name(name.lower())
                     self._set_active(btn)
-            btn.connect("clicked", self._on_nav, btn, name.lower())
+            btn.connect("clicked", self._on_nav, name.lower())
             self._nav_buttons[name.lower()] = btn
             sidebar.append(btn)
 
         nav.append(sidebar)
         nav.append(self._stack)
 
-        self.set_content(nav)
+        self.set_child(nav)
 
     def _set_active(self, active_btn):
         for btn in self._nav_buttons.values():

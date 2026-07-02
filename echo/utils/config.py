@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -130,6 +131,7 @@ class _DictSettingsBackend:
 
 class Settings:
     _instance: Optional["Settings"] = None
+    _instance_lock: threading.Lock = threading.Lock()
 
     def __init__(self):
         schema_source = Gio.SettingsSchemaSource.get_default()
@@ -142,7 +144,9 @@ class Settings:
     @classmethod
     def get(cls) -> "Settings":
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     def get_bool(self, key: str) -> bool:

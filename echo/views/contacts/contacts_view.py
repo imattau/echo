@@ -34,6 +34,8 @@ class ContactsView(Gtk.Box):
         self._follows_you: set[str] = set()
         self._active_filter = self.FILTER_ALL
         self._search_query = ""
+        self._needs_render = False
+        self._render_source_id = 0
 
         self._build_nav_panel()
         self._build_content()
@@ -187,11 +189,22 @@ class ContactsView(Gtk.Box):
         self._search_query = entry.get_text().strip().lower()
         self._render_contacts()
 
+    def _schedule_render(self):
+        self._needs_render = True
+        if self._render_source_id > 0:
+            return
+        self._render_source_id = GLib.timeout_add(0, self._do_render)
+
+    def _do_render(self) -> bool:
+        self._render_source_id = 0
+        if not self._needs_render:
+            return False
+        self._needs_render = False
+        self._render_contacts()
+        return False
+
     def _render_contacts(self):
-        while True:
-            child = self._list_box.get_first_child()
-            if child is None:
-                break
+        while child := self._list_box.get_first_child():
             self._list_box.remove(child)
 
         filtered = self._get_filtered_contacts()
@@ -292,37 +305,34 @@ class ContactsView(Gtk.Box):
 
     def set_contacts(self, profiles: list[Profile]):
         self._contacts = profiles
-        GLib.idle_add(self._render_contacts)
+        self._schedule_render()
 
     def add_profile(self, profile: Profile):
         for i, p in enumerate(self._contacts):
             if p.pubkey == profile.pubkey:
                 self._contacts[i] = profile
-                GLib.idle_add(self._render_contacts)
+                self._schedule_render()
                 return
         self._contacts.append(profile)
-        GLib.idle_add(self._render_contacts)
+        self._schedule_render()
 
     def set_following(self, pubkeys: set[str]):
         self._following = pubkeys
 
     def set_muted(self, pubkeys: set[str]):
         self._muted = pubkeys
-        GLib.idle_add(self._render_contacts)
+        self._schedule_render()
 
     def set_blocked(self, pubkeys: set[str]):
         self._blocked = pubkeys
-        GLib.idle_add(self._render_contacts)
+        self._schedule_render()
 
     def set_follows_you(self, pubkeys: set[str]):
         self._follows_you = pubkeys
 
     def clear(self):
         self._contacts.clear()
-        while True:
-            child = self._list_box.get_first_child()
-            if child is None:
-                break
+        while child := self._list_box.get_first_child():
             self._list_box.remove(child)
 
     def show_loading(self, loading: bool):

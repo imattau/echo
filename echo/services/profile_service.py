@@ -1,4 +1,5 @@
 import json
+import threading
 from typing import Callable, Optional
 
 from datetime import timedelta
@@ -11,6 +12,7 @@ class ProfileService:
     def __init__(self):
         self._client = Client()
         self._bridge = AsyncBridge.get()
+        self._lock = threading.Lock()
         self._cache: dict[str, Profile] = {}
 
     def fetch_profile(self, pubkey: str, callback: Optional[Callable] = None):
@@ -23,18 +25,22 @@ class ProfileService:
         for event in events.to_vec():
             profile = self._parse_profile(pubkey, event)
             if profile:
-                self._cache[pubkey] = profile
+                with self._lock:
+                    self._cache[pubkey] = profile
                 if callback:
                     self._bridge.idle_add(callback, profile)
 
     def get_cached(self, pubkey: str) -> Optional[Profile]:
-        return self._cache.get(pubkey)
+        with self._lock:
+            return self._cache.get(pubkey)
 
     def update_profile(self, profile: Profile):
-        self._cache[profile.pubkey] = profile
+        with self._lock:
+            self._cache[profile.pubkey] = profile
 
     def get_all_cached(self) -> list[Profile]:
-        return list(self._cache.values())
+        with self._lock:
+            return list(self._cache.values())
 
     def _parse_profile(self, pubkey: str, event: Event) -> Optional[Profile]:
         try:

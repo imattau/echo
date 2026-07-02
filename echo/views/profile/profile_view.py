@@ -21,6 +21,7 @@ class ProfileView(Gtk.Box):
         "back": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "follow": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "tab-changed": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "edit-profile": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
     def __init__(self, profile: Profile = None, own_pubkey: str = ""):
@@ -90,14 +91,16 @@ class ProfileView(Gtk.Box):
         header.append(info)
 
         is_own = profile and self._own_pubkey == profile.pubkey
-        self._follow_btn = Gtk.Button(label="Follow")
-        self._follow_btn.add_css_class("suggested-action")
+        self._follow_btn = Gtk.Button(
+            label="Edit Profile" if is_own else "Follow"
+        )
+        if is_own:
+            self._follow_btn.remove_css_class("suggested-action")
+        else:
+            self._follow_btn.add_css_class("suggested-action")
         self._follow_btn.set_halign(Gtk.Align.END)
         self._follow_btn.set_hexpand(True)
-        if is_own:
-            self._follow_btn.set_visible(False)
-        else:
-            self._follow_btn.connect("clicked", self._on_follow_clicked)
+        self._follow_btn.connect("clicked", self._on_action_clicked)
         header.append(self._follow_btn)
 
         self.append(header)
@@ -138,7 +141,13 @@ class ProfileView(Gtk.Box):
             label.set_label(_fmt_count(val))
 
         is_own = self._own_pubkey == profile.pubkey
-        self._follow_btn.set_visible(not is_own)
+        self._follow_btn.set_visible(True)
+        if is_own:
+            self._follow_btn.set_label("Edit Profile")
+            self._follow_btn.remove_css_class("suggested-action")
+        else:
+            self._follow_btn.set_label("Follow")
+            self._follow_btn.add_css_class("suggested-action")
 
     def add_note_card(self, card):
         self._content_area.append(card)
@@ -146,16 +155,19 @@ class ProfileView(Gtk.Box):
     def clear_content(self):
         self._content_area.remove_all()
 
-    def _on_follow_clicked(self, btn):
-        self.emit("follow")
-        if btn.get_label() == "Follow":
-            btn.set_label("Unfollow")
-            btn.remove_css_class("suggested-action")
-            btn.add_css_class("destructive-action")
+    def _on_action_clicked(self, btn):
+        if btn.get_label() == "Edit Profile":
+            self.emit("edit-profile")
         else:
-            btn.set_label("Follow")
-            btn.remove_css_class("destructive-action")
-            btn.add_css_class("suggested-action")
+            self.emit("follow")
+            if btn.get_label() == "Follow":
+                btn.set_label("Unfollow")
+                btn.remove_css_class("suggested-action")
+                btn.add_css_class("destructive-action")
+            else:
+                btn.set_label("Follow")
+                btn.remove_css_class("destructive-action")
+                btn.add_css_class("suggested-action")
 
     def _on_tab_toggled(self, btn, tab_name: str):
         if btn.get_active():

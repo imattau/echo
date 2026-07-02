@@ -1,3 +1,4 @@
+import threading
 from typing import Callable, Optional
 
 from nostr_sdk import (
@@ -10,17 +11,20 @@ from .async_bridge import AsyncBridge
 class ZapService:
     def __init__(self):
         self._bridge = AsyncBridge.get()
+        self._lock = threading.Lock()
         self._nwc: Optional[Nwc] = None
         self._connected = False
         self._balance = 0
 
     @property
     def is_connected(self) -> bool:
-        return self._connected
+        with self._lock:
+            return self._connected
 
     @property
     def balance(self) -> int:
-        return self._balance
+        with self._lock:
+            return self._balance
 
     def connect(self, connection_string: str, callback: Optional[Callable] = None):
         self._bridge.run(self._do_connect(connection_string, callback))
@@ -28,28 +32,33 @@ class ZapService:
     async def _do_connect(self, connection_string: str, callback: Optional[Callable] = None):
         try:
             uri = NostrWalletConnectUri.parse(connection_string)
-            self._nwc = Nwc(uri)
-            info = await self._nwc.get_info()
-            self._connected = True
+            nwc = Nwc(uri)
+            info = await nwc.get_info()
             name = info.alias or ""
-            if self._nwc:
-                try:
-                    balance = await self._nwc.get_balance()
-                    self._balance = balance.balance if hasattr(balance, "balance") else 0
-                except Exception:
-                    pass
+            balance = 0
+            try:
+                balance_resp = await nwc.get_balance()
+                balance = balance_resp.balance if hasattr(balance_resp, "balance") else 0
+            except Exception:
+                pass
+            with self._lock:
+                self._nwc = nwc
+                self._connected = True
+                self._balance = balance
             if callback:
-                self._bridge.idle_add(callback, True, name, str(self._balance))
+                self._bridge.idle_add(callback, True, name, str(balance))
         except Exception as e:
-            self._connected = False
-            self._nwc = None
+            with self._lock:
+                self._connected = False
+                self._nwc = None
             if callback:
                 self._bridge.idle_add(callback, False, str(e), "")
 
     def disconnect(self):
-        self._nwc = None
-        self._connected = False
-        self._balance = 0
+        with self._lock:
+            self._nwc = None
+            self._connected = False
+            self._balance = 0
 
     def send_zap(self, pubkey: str, amount: int, message: str = "") -> bool:
         self._bridge.run(self._do_zap(pubkey, amount, message))
@@ -57,7 +66,9 @@ class ZapService:
 
     async def _do_zap(self, pubkey: str, amount: int, message: str):
         try:
-            if not self._nwc:
+            with self._lock:
+                nwc = self._nwc
+            if not nwc:
                 return
             from nostr_sdk import PayInvoiceRequest
             recipient_pk = PublicKey.parse(pubkey)

@@ -22,6 +22,7 @@ from .views.media.lightbox_view import MediaLightbox
 from .views.profile.profile_view import ProfileView
 from .views.modals.compose_dialog import ComposeDialog
 from .views.modals.zap_dialog import ZapDialog
+from .views.modals.edit_profile_dialog import EditProfileDialog
 from .views.modals.account_switcher import AccountSwitcherPopover
 from .views.settings.settings_window import SettingsWindow
 from .views.onboarding.import_key_view import ImportKeyView
@@ -33,11 +34,12 @@ from echo.utils.config import Config, Settings
 from echo.widgets.error_dialog import ErrorDialog, ConfirmDialog
 
 
-class EchoWindow(Adw.ApplicationWindow):
+class EchoWindow(Gtk.ApplicationWindow):
     def __init__(self, key_manager=None, relay_manager=None, **kwargs):
         super().__init__(**kwargs)
         self.set_title("Echo")
         self.set_default_size(1200, 800)
+        self.set_titlebar(Gtk.HeaderBar())
 
         self._key_manager = key_manager or KeyManager.get()
         self._relay_manager = relay_manager or RelayManager()
@@ -89,11 +91,14 @@ class EchoWindow(Adw.ApplicationWindow):
         paned.set_shrink_end_child(False)
         paned.set_position(240)
 
-        self.set_content(paned)
+        self.set_child(paned)
 
         feed = self._pages.get("feed")
         if isinstance(feed, FeedView):
             feed.connect("refresh", self._on_feed_refresh)
+        following = self._pages.get("following")
+        if isinstance(following, FeedView):
+            following.connect("refresh", self._on_feed_refresh)
         thread = self._pages.get("thread")
         if isinstance(thread, ThreadView):
             thread.connect("back", lambda _: self.content.set_visible_child_name("feed"))
@@ -132,12 +137,30 @@ class EchoWindow(Adw.ApplicationWindow):
             contacts.connect("block", self._on_contacts_block)
             contacts.connect("unblock", self._on_contacts_unblock)
 
+        self._following: set[str] = set()
+        self._muted: set[str] = set()
+        self._blocked: set[str] = set()
+
         self._connect_default_relays()
+        self._load_own_lists()
 
     def _connect_default_relays(self):
         if self._key_manager.has_key:
             for url in Config.DEFAULT_RELAYS:
                 self._relay_manager.add_relay(url)
+
+    def _load_own_lists(self):
+        if not self._key_manager.has_key:
+            return
+        from nostr_sdk import Filter, Kind, PublicKey
+        client = NostrClient(client=self._relay_manager.client)
+        pk = self._key_manager.pubkey
+        if pk:
+            pubkey = PublicKey.parse(pk)
+            f = Filter().kinds([Kind(3)]).authors([pubkey]).limit(1)
+            client.subscribe(f, self._on_contact_list_received)
+            mute_f = Filter().kinds([Kind(10000)]).authors([pubkey]).limit(1)
+            client.subscribe(mute_f, self._on_mute_list_received)
 
     def _restore_window_state(self, settings):
         if settings.get_bool("restore-last-window-state"):
@@ -203,7 +226,7 @@ class EchoWindow(Adw.ApplicationWindow):
             keys = self._key_manager.keys
             signer = EventSigner(keys)
             event = signer.sign_text_note(text)
-            client = NostrClient()
+            client = NostrClient(client=self._relay_manager.client)
             client.publish_event(event)
         except Exception:
             ErrorDialog(self, title="Failed to post", message="Could not publish your note. Check your relay connection.").present()
@@ -231,16 +254,20 @@ class EchoWindow(Adw.ApplicationWindow):
     def _on_feed_refresh(self, feed):
         feed.show_loading(True)
         if self._key_manager.has_key:
-            from nostr_sdk import Filter, Kind, PublicKey
-            client = NostrClient()
+            from nostr_sdk import Filter, Kind
+            client = NostrClient(client=self._relay_manager.client)
             f = Filter().kinds([Kind(1)]).limit(20)
-            client.subscribe(f, self._on_event_received)
+            client.subscribe(
+                f,
+                lambda e: self._on_event_received(e, feed),
+                done_callback=lambda: feed.show_loading(False),
+            )
 
     def _on_discover_search(self, _page, query: str):
         if not self._key_manager.has_key:
             return
         from nostr_sdk import Filter, Kind
-        client = NostrClient()
+        client = NostrClient(client=self._relay_manager.client)
         f = Filter().kinds([Kind(1)]).search(query).limit(50)
         client.subscribe(f, self._on_discover_result)
 
@@ -248,7 +275,7 @@ class EchoWindow(Adw.ApplicationWindow):
         if not self._key_manager.has_key:
             return
         from nostr_sdk import Filter, Kind
-        client = NostrClient()
+        client = NostrClient(client=self._relay_manager.client)
         f = Filter().kinds([Kind(1)]).hashtag(tag.lstrip("#")).limit(50)
         client.subscribe(f, self._on_discover_result)
 
@@ -256,7 +283,7 @@ class EchoWindow(Adw.ApplicationWindow):
         from echo.models.note import Note
         from echo.models.profile import Profile
 
-        pubkey = event.pubkey().to_hex()
+        pubkey = event.author().to_hex()
         profile = Profile(pubkey=pubkey)
 
         note = Note(
@@ -264,7 +291,7 @@ class EchoWindow(Adw.ApplicationWindow):
             pubkey=pubkey,
             content=event.content(),
             kind=event.kind().as_u16(),
-            created_at=event.created_at().as_u64(),
+            created_at=event.created_at().as_secs(),
             profile=profile,
         )
 
@@ -272,6 +299,18 @@ class EchoWindow(Adw.ApplicationWindow):
         card.connect("reply", self._on_note_reply)
         card.connect("profile-clicked", self._on_note_profile_clicked)
         card.connect("zap", self._on_note_zap)
+        card.connect("follow", self._on_note_follow)
+        card.connect("unfollow", self._on_note_unfollow)
+        card.connect("mute", self._on_note_mute)
+        card.connect("unmute", self._on_note_unmute)
+        card.connect("block", self._on_note_block)
+        card.connect("unblock", self._on_note_unblock)
+        if pubkey in self._following:
+            card.set_following(True)
+        if pubkey in self._muted:
+            card.set_muted(True)
+        if pubkey in self._blocked:
+            card.set_blocked(True)
 
         discover = self._pages.get("discover")
         if isinstance(discover, DiscoverView):
@@ -285,12 +324,12 @@ class EchoWindow(Adw.ApplicationWindow):
             bookmarks.show_loading(True)
             bookmarks.clear()
         from nostr_sdk import Filter, Kind, PublicKey
-        client = NostrClient()
+        client = NostrClient(client=self._relay_manager.client)
         pk = self._key_manager.pubkey
         if pk:
             pubkey = PublicKey.parse(pk)
             f = Filter().kinds([Kind(34)]).authors([pubkey]).limit(10)
-            client.subscribe(f, self._on_bookmarks_list_received)
+            client.subscribe(f, self._on_bookmarks_list_received, done_callback=lambda: bookmarks.show_loading(False))
 
     def _on_bookmarks_list_received(self, event):
         from nostr_sdk import EventId, Filter
@@ -304,8 +343,10 @@ class EchoWindow(Adw.ApplicationWindow):
                     pass
         if ids:
             f = Filter().ids(ids).limit(50)
-            client = NostrClient()
-            client.subscribe(f, self._on_bookmark_event_received)
+            client = NostrClient(client=self._relay_manager.client)
+            bookmarks = self._pages.get("bookmarks")
+            if isinstance(bookmarks, BookmarksView):
+                client.subscribe(f, self._on_bookmark_event_received, done_callback=lambda: bookmarks.show_loading(False))
         else:
             bookmarks = self._pages.get("bookmarks")
             if isinstance(bookmarks, BookmarksView):
@@ -315,7 +356,7 @@ class EchoWindow(Adw.ApplicationWindow):
         from echo.models.note import Note
         from echo.models.profile import Profile
 
-        pubkey = event.pubkey().to_hex()
+        pubkey = event.author().to_hex()
         profile = Profile(pubkey=pubkey)
 
         note = Note(
@@ -323,7 +364,7 @@ class EchoWindow(Adw.ApplicationWindow):
             pubkey=pubkey,
             content=event.content(),
             kind=event.kind().as_u16(),
-            created_at=event.created_at().as_u64(),
+            created_at=event.created_at().as_secs(),
             profile=profile,
         )
 
@@ -331,17 +372,28 @@ class EchoWindow(Adw.ApplicationWindow):
         card.connect("reply", self._on_note_reply)
         card.connect("profile-clicked", self._on_note_profile_clicked)
         card.connect("zap", self._on_note_zap)
+        card.connect("follow", self._on_note_follow)
+        card.connect("unfollow", self._on_note_unfollow)
+        card.connect("mute", self._on_note_mute)
+        card.connect("unmute", self._on_note_unmute)
+        card.connect("block", self._on_note_block)
+        card.connect("unblock", self._on_note_unblock)
+        if pubkey in self._following:
+            card.set_following(True)
+        if pubkey in self._muted:
+            card.set_muted(True)
+        if pubkey in self._blocked:
+            card.set_blocked(True)
 
         bookmarks = self._pages.get("bookmarks")
         if isinstance(bookmarks, BookmarksView):
             bookmarks.add_bookmark(card)
-            bookmarks.show_loading(False)
 
-    def _on_event_received(self, event):
+    def _on_event_received(self, event, feed=None):
         from echo.models.note import Note
         from echo.models.profile import Profile
 
-        pubkey = event.pubkey().to_hex()
+        pubkey = event.author().to_hex()
         profile = Profile(pubkey=pubkey)
 
         note = Note(
@@ -349,7 +401,7 @@ class EchoWindow(Adw.ApplicationWindow):
             pubkey=pubkey,
             content=event.content(),
             kind=event.kind().as_u16(),
-            created_at=event.created_at().as_u64(),
+            created_at=event.created_at().as_secs(),
             profile=profile,
         )
 
@@ -357,11 +409,22 @@ class EchoWindow(Adw.ApplicationWindow):
         card.connect("reply", self._on_note_reply)
         card.connect("profile-clicked", self._on_note_profile_clicked)
         card.connect("zap", self._on_note_zap)
+        card.connect("follow", self._on_note_follow)
+        card.connect("unfollow", self._on_note_unfollow)
+        card.connect("mute", self._on_note_mute)
+        card.connect("unmute", self._on_note_unmute)
+        card.connect("block", self._on_note_block)
+        card.connect("unblock", self._on_note_unblock)
+        if pubkey in self._following:
+            card.set_following(True)
+        if pubkey in self._muted:
+            card.set_muted(True)
+        if pubkey in self._blocked:
+            card.set_blocked(True)
 
-        feed = self._pages.get("feed")
-        if isinstance(feed, FeedView):
-            feed.add_note(card)
-            feed.show_loading(False)
+        target = feed or self._pages.get("feed")
+        if isinstance(target, FeedView):
+            target.add_note(card)
 
     def _on_media_refresh(self, _view):
         if not self._key_manager.has_key:
@@ -371,16 +434,16 @@ class EchoWindow(Adw.ApplicationWindow):
             media_view.show_loading(True)
             media_view.clear()
         from nostr_sdk import Filter, Kind
-        client = NostrClient()
+        client = NostrClient(client=self._relay_manager.client)
         f = Filter().kinds([Kind(1), Kind(20), Kind(21), Kind(22)]).limit(50)
-        client.subscribe(f, self._on_media_event_received)
+        client.subscribe(f, self._on_media_event_received, done_callback=lambda: media_view.show_loading(False))
 
     def _on_media_event_received(self, event):
         from echo.models.note import Note
         from echo.models.profile import Profile
 
         kind = event.kind().as_u16()
-        pubkey = event.pubkey().to_hex()
+        pubkey = event.author().to_hex()
         profile = Profile(pubkey=pubkey)
 
         note = Note(
@@ -388,7 +451,7 @@ class EchoWindow(Adw.ApplicationWindow):
             pubkey=pubkey,
             content=event.content(),
             kind=kind,
-            created_at=event.created_at().as_u64(),
+            created_at=event.created_at().as_secs(),
             profile=profile,
         )
 
@@ -430,8 +493,6 @@ class EchoWindow(Adw.ApplicationWindow):
                     )
                     media_view.add_media_item(item)
 
-        media_view.show_loading(False)
-
     def _on_media_open(self, _view, items: list, index: int):
         lightbox = MediaLightbox(self, items, index)
         lightbox.present()
@@ -454,6 +515,7 @@ class EchoWindow(Adw.ApplicationWindow):
         view.connect("back", lambda _v: self.content.set_visible_child_name("feed"))
         view.connect("follow", lambda _v: self._on_profile_follow(view, pubkey))
         view.connect("tab-changed", lambda _v, tab: self._on_profile_tab_changed(view, tab))
+        view.connect("edit-profile", lambda _v: self._on_edit_profile())
         self._pages["profile"] = view
         self.content.add_named(view, "profile")
         self.content.set_visible_child_name("profile")
@@ -474,11 +536,103 @@ class EchoWindow(Adw.ApplicationWindow):
         elif tab == "zapped":
             pass
 
+    def _on_edit_profile(self):
+        pubkey = self._key_manager.pubkey or ""
+        if not pubkey:
+            return
+        profile = self._profile_service.get_cached(pubkey)
+        dialog = EditProfileDialog(self, profile=profile)
+        dialog.connect("save", self._on_edit_profile_save)
+        dialog.present()
+
+    def _on_edit_profile_save(self, dialog, metadata: dict):
+        pubkey = self._key_manager.pubkey or ""
+        if not pubkey:
+            return
+        if not self._key_manager.has_key:
+            return
+        from echo.services.event_signer import EventSigner
+        from echo.services.nostr_client import NostrClient
+        try:
+            keys = self._key_manager.keys
+            signer = EventSigner(keys)
+            event = signer.sign_metadata(metadata)
+            client = NostrClient(client=self._relay_manager.client)
+            client.publish_event(event)
+            from echo.models.profile import Profile
+            new_profile = Profile(
+                pubkey=pubkey,
+                name=metadata.get("name", ""),
+                display_name=metadata.get("display_name", ""),
+                about=metadata.get("about", ""),
+                picture=metadata.get("picture", ""),
+                banner=metadata.get("banner", ""),
+                nip05=metadata.get("nip05", ""),
+                lud16=metadata.get("lud16", ""),
+                website=metadata.get("website", ""),
+            )
+            self._profile_service.update_profile(new_profile)
+            profile_view = self._pages.get("profile")
+            if profile_view and hasattr(profile_view, "set_profile"):
+                profile_view.set_profile(new_profile)
+        except Exception:
+            from echo.widgets.error_dialog import ErrorDialog
+            ErrorDialog(
+                self, title="Failed to update profile",
+                message="Could not publish profile update. Check your relay connection."
+            ).present()
+
     def _on_note_zap(self, card):
         profile = card._note.profile if hasattr(card, "_note") else None
         name = profile.name or profile.handle if profile else ""
         dialog = ZapDialog(self, recipient_name=name)
         dialog.present()
+
+    def _on_note_follow(self, card, pubkey: str):
+        self._following.add(pubkey)
+        card.set_following(True)
+        self._publish_contact_list(self._following)
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_following(self._following)
+
+    def _on_note_unfollow(self, card, pubkey: str):
+        self._following.discard(pubkey)
+        card.set_following(False)
+        self._publish_contact_list(self._following)
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_following(self._following)
+
+    def _on_note_mute(self, card, pubkey: str):
+        self._muted.add(pubkey)
+        card.set_muted(True)
+        self._publish_mute_list(self._muted)
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_muted(self._muted)
+
+    def _on_note_unmute(self, card, pubkey: str):
+        self._muted.discard(pubkey)
+        card.set_muted(False)
+        self._publish_mute_list(self._muted)
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_muted(self._muted)
+
+    def _on_note_block(self, card, pubkey: str):
+        self._blocked.add(pubkey)
+        card.set_blocked(True)
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_blocked(self._blocked)
+
+    def _on_note_unblock(self, card, pubkey: str):
+        self._blocked.discard(pubkey)
+        card.set_blocked(False)
+        contacts = self._pages.get("contacts")
+        if isinstance(contacts, ContactsView):
+            contacts.set_blocked(self._blocked)
 
     def _on_dm_conversation_selected(self, _list, pubkey: str):
         conv = self._pages.get("dm-conversation")
@@ -552,10 +706,11 @@ class EchoWindow(Adw.ApplicationWindow):
         from echo.services.nostr_client import NostrClient
         try:
             receiver = PublicKey.parse(pubkey)
-            client = NostrClient()
-            client.send_private_msg(receiver, text)
-        except Exception:
-            pass
+            client = NostrClient(client=self._relay_manager.client)
+            client.send_private_msg(self._key_manager.keys, receiver, text)
+        except Exception as e:
+            from echo.widgets.error_dialog import ErrorDialog
+            ErrorDialog(self, title="Failed to send message", message=str(e)).present()
 
     def _on_contacts_load(self, _view):
         if not self._key_manager.has_key:
@@ -565,14 +720,14 @@ class EchoWindow(Adw.ApplicationWindow):
             contacts.clear()
             contacts.show_loading(True)
         from nostr_sdk import Filter, Kind, PublicKey
-        client = NostrClient()
+        client = NostrClient(client=self._relay_manager.client)
         pk = self._key_manager.pubkey
         if pk:
             pubkey = PublicKey.parse(pk)
             f = Filter().kinds([Kind(3)]).authors([pubkey]).limit(1)
             client.subscribe(f, self._on_contact_list_received)
             mute_f = Filter().kinds([Kind(10000)]).authors([pubkey]).limit(1)
-            client.subscribe(mute_f, self._on_mute_list_received)
+            client.subscribe(mute_f, self._on_mute_list_received, done_callback=lambda: contacts.show_loading(False))
 
     def _on_contact_list_received(self, event):
         contact_pubkeys = []
@@ -580,9 +735,10 @@ class EchoWindow(Adw.ApplicationWindow):
             t = tag.as_vec()
             if len(t) >= 2 and t[0] == "p":
                 contact_pubkeys.append(t[1])
+        self._following = set(contact_pubkeys)
         contacts = self._pages.get("contacts")
         if isinstance(contacts, ContactsView):
-            contacts.set_following(set(contact_pubkeys))
+            contacts.set_following(self._following)
         for pk in contact_pubkeys:
             self._profile_service.fetch_profile(pk, self._on_contact_profile_received)
 
@@ -598,6 +754,7 @@ class EchoWindow(Adw.ApplicationWindow):
             t = tag.as_vec()
             if len(t) >= 2 and t[0] == "p":
                 muted.add(t[1])
+        self._muted = muted
         contacts = self._pages.get("contacts")
         if isinstance(contacts, ContactsView):
             contacts.set_muted(muted)
@@ -648,10 +805,7 @@ class EchoWindow(Adw.ApplicationWindow):
         except Exception:
             return
         window.close()
-        contact_pubkeys = set()
-        contacts_view = self._pages.get("contacts")
-        if isinstance(contacts_view, ContactsView):
-            contact_pubkeys = set(contacts_view._following)
+        contact_pubkeys = set(self._following)
         contact_pubkeys.add(pubkey)
         self._publish_contact_list(contact_pubkeys)
         self._profile_service.fetch_profile(pubkey, self._on_contact_profile_received)
@@ -660,17 +814,17 @@ class EchoWindow(Adw.ApplicationWindow):
         contacts_view = self._pages.get("contacts")
         if not isinstance(contacts_view, ContactsView):
             return
-        following = set(contacts_view._following)
-        following.add(pubkey)
-        self._publish_contact_list(following)
+        self._following.add(pubkey)
+        contacts_view.set_following(self._following)
+        self._publish_contact_list(self._following)
 
     def _on_contacts_unfollow(self, _view, pubkey: str):
         contacts_view = self._pages.get("contacts")
         if not isinstance(contacts_view, ContactsView):
             return
-        following = set(contacts_view._following)
-        following.discard(pubkey)
-        self._publish_contact_list(following)
+        self._following.discard(pubkey)
+        contacts_view.set_following(self._following)
+        self._publish_contact_list(self._following)
 
     def _publish_contact_list(self, pubkeys: set[str]):
         if not self._key_manager.has_key:
@@ -682,7 +836,7 @@ class EchoWindow(Adw.ApplicationWindow):
             keys = self._key_manager.keys
             signer = EventSigner(keys)
             event = signer.sign_contact_list(contacts_with_relays)
-            client = NostrClient()
+            client = NostrClient(client=self._relay_manager.client)
             client.publish_event(event)
         except Exception:
             pass
@@ -691,19 +845,17 @@ class EchoWindow(Adw.ApplicationWindow):
         contacts_view = self._pages.get("contacts")
         if not isinstance(contacts_view, ContactsView):
             return
-        muted = set(contacts_view._muted)
-        muted.add(pubkey)
-        contacts_view.set_muted(muted)
-        self._publish_mute_list(muted)
+        self._muted.add(pubkey)
+        contacts_view.set_muted(self._muted)
+        self._publish_mute_list(self._muted)
 
     def _on_contacts_unmute(self, _view, pubkey: str):
         contacts_view = self._pages.get("contacts")
         if not isinstance(contacts_view, ContactsView):
             return
-        muted = set(contacts_view._muted)
-        muted.discard(pubkey)
-        contacts_view.set_muted(muted)
-        self._publish_mute_list(muted)
+        self._muted.discard(pubkey)
+        contacts_view.set_muted(self._muted)
+        self._publish_mute_list(self._muted)
 
     def _publish_mute_list(self, muted: set[str]):
         if not self._key_manager.has_key:
@@ -715,7 +867,7 @@ class EchoWindow(Adw.ApplicationWindow):
             tags = [Tag.parse(["p", pk]) for pk in muted]
             builder = EventBuilder(Kind(10000), "").tags(tags)
             event = builder.sign_with_keys(keys)
-            client = NostrClient()
+            client = NostrClient(client=self._relay_manager.client)
             client.publish_event(event)
         except Exception:
             pass
@@ -724,14 +876,12 @@ class EchoWindow(Adw.ApplicationWindow):
         contacts_view = self._pages.get("contacts")
         if not isinstance(contacts_view, ContactsView):
             return
-        blocked = set(contacts_view._blocked)
-        blocked.add(pubkey)
-        contacts_view.set_blocked(blocked)
+        self._blocked.add(pubkey)
+        contacts_view.set_blocked(self._blocked)
 
     def _on_contacts_unblock(self, _view, pubkey: str):
         contacts_view = self._pages.get("contacts")
         if not isinstance(contacts_view, ContactsView):
             return
-        blocked = set(contacts_view._blocked)
-        blocked.discard(pubkey)
-        contacts_view.set_blocked(blocked)
+        self._blocked.discard(pubkey)
+        contacts_view.set_blocked(self._blocked)

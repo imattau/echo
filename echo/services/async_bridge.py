@@ -8,6 +8,7 @@ from gi.repository import GLib
 
 class AsyncBridge:
     _instance: Optional["AsyncBridge"] = None
+    _instance_lock: threading.Lock = threading.Lock()
 
     def __init__(self):
         self._loop = asyncio.new_event_loop()
@@ -17,7 +18,9 @@ class AsyncBridge:
     @classmethod
     def get(cls) -> "AsyncBridge":
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     def _run_loop(self):

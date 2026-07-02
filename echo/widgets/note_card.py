@@ -1,9 +1,10 @@
 import gi
 
 gi.require_version("Gtk", "4.0")
+gi.require_version("Gio", "2.0")
 gi.require_version("GLib", "2.0")
 
-from gi.repository import Gtk, GLib, Pango, GObject
+from gi.repository import Gtk, GLib, Pango, GObject, Gio
 from echo.models import Note
 from .engagement_bar import EngagementBar
 from .avatar import Avatar
@@ -17,6 +18,12 @@ class NoteCard(Gtk.Box):
         "repost": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "like": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "zap": (GObject.SignalFlags.RUN_FIRST, None, ()),
+        "follow": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "unfollow": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "mute": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "unmute": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "block": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "unblock": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
     }
 
     def __init__(self, note: Note):
@@ -24,6 +31,9 @@ class NoteCard(Gtk.Box):
         self.add_css_class("note-card")
         self._note = note
         self._show_more = False
+        self._is_following = False
+        self._is_muted = False
+        self._is_blocked = False
 
         self._build_header()
         self._build_content()
@@ -53,6 +63,11 @@ class NoteCard(Gtk.Box):
 
         header.append(avatar)
         header.append(info)
+
+        menu_btn = Gtk.Button(label="⋯")
+        menu_btn.add_css_class("note-card-menu-btn")
+        menu_btn.connect("clicked", self._on_author_menu)
+        header.append(menu_btn)
 
         click = Gtk.GestureClick()
         click.connect("pressed", lambda *_: self.emit("profile-clicked", self._note.pubkey))
@@ -90,6 +105,70 @@ class NoteCard(Gtk.Box):
         self._content_box.set_visible(False)
         self.remove(self._content_box)
         self._build_content()
+
+    def _on_author_menu(self, btn):
+        popover = Gtk.PopoverMenu()
+        menu_model = Gio.Menu()
+
+        if self._is_following:
+            item = Gio.MenuItem.new("Unfollow", "note.unfollow")
+        else:
+            item = Gio.MenuItem.new("Follow", "note.follow")
+        menu_model.append_item(item)
+
+        if self._is_muted:
+            item = Gio.MenuItem.new("Unmute", "note.unmute")
+        else:
+            item = Gio.MenuItem.new("Mute", "note.mute")
+        menu_model.append_item(item)
+
+        if self._is_blocked:
+            item = Gio.MenuItem.new("Unblock", "note.unblock")
+        else:
+            item = Gio.MenuItem.new("Block", "note.block")
+        menu_model.append_item(item)
+
+        popover.set_menu_model(menu_model)
+        popover.set_parent(btn)
+
+        action_group = Gio.SimpleActionGroup()
+        pubkey = self._note.pubkey
+
+        if self._is_following:
+            action = Gio.SimpleAction.new("unfollow", None)
+            action.connect("activate", lambda *_: self.emit("unfollow", pubkey))
+        else:
+            action = Gio.SimpleAction.new("follow", None)
+            action.connect("activate", lambda *_: self.emit("follow", pubkey))
+        action_group.add_action(action)
+
+        if self._is_muted:
+            action = Gio.SimpleAction.new("unmute", None)
+            action.connect("activate", lambda *_: self.emit("unmute", pubkey))
+        else:
+            action = Gio.SimpleAction.new("mute", None)
+            action.connect("activate", lambda *_: self.emit("mute", pubkey))
+        action_group.add_action(action)
+
+        if self._is_blocked:
+            action = Gio.SimpleAction.new("unblock", None)
+            action.connect("activate", lambda *_: self.emit("unblock", pubkey))
+        else:
+            action = Gio.SimpleAction.new("block", None)
+            action.connect("activate", lambda *_: self.emit("block", pubkey))
+        action_group.add_action(action)
+
+        btn.insert_action_group("note", action_group)
+        popover.popup()
+
+    def set_following(self, following: bool):
+        self._is_following = following
+
+    def set_muted(self, muted: bool):
+        self._is_muted = muted
+
+    def set_blocked(self, blocked: bool):
+        self._is_blocked = blocked
 
     def _build_media(self):
         urls = self._note.media_urls

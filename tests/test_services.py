@@ -8,7 +8,7 @@ from echo.services.zap_service import ZapService
 class TestNostrClient:
     def test_init(self):
         client = NostrClient()
-        assert client.relays == {}
+        assert client.get_relay_status() == {}
 
 
 class TestKeyManager:
@@ -21,7 +21,6 @@ class TestKeyManager:
 class TestRelayManager:
     def test_init(self):
         rm = RelayManager()
-        assert rm.relays == {}
         assert rm.get_relays() == []
 
 

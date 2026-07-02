@@ -35,6 +35,15 @@
     border: 1px solid @borders;
 }
 
+.note-card-menu-btn {
+    background-color: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    color: @insensitive_fg_color;
+    padding: 4px 8px;
+}
+
 .engagement-button {
     background-color: @shade_color;
     border-radius: 8px;

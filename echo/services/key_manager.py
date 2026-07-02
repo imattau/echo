@@ -1,14 +1,18 @@
+import asyncio
 import json
+import threading
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable
 
 from nostr_sdk import Keys, SecretKey, PublicKey
 
 from echo.utils.config import Config
+from .async_bridge import AsyncBridge
 
 
 class KeyManager:
     _instance: Optional["KeyManager"] = None
+    _instance_lock: threading.Lock = threading.Lock()
 
     def __init__(self):
         self._keys: Optional[Keys] = None
@@ -17,7 +21,9 @@ class KeyManager:
     @classmethod
     def get(cls) -> "KeyManager":
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     @property
@@ -59,18 +65,24 @@ class KeyManager:
             return False
 
     def save_to_keyring(self) -> bool:
+        AsyncBridge.get().run(self._do_save_to_keyring())
+        return True
+
+    async def _do_save_to_keyring(self):
         try:
             import secretstorage
-            connection = secretstorage.dbus_init()
-            collection = secretstorage.get_default_collection(connection)
-            collection.create_item(
-                f"{Config.APP_ID} - nsec",
-                {"application": Config.APP_ID},
-                (self.nsec or "").encode(),
-            )
-            return True
+            loop = asyncio.get_running_loop()
+            def _blocking_save():
+                connection = secretstorage.dbus_init()
+                collection = secretstorage.get_default_collection(connection)
+                collection.create_item(
+                    f"{Config.APP_ID} - nsec",
+                    {"application": Config.APP_ID},
+                    (self.nsec or "").encode(),
+                )
+            await loop.run_in_executor(None, _blocking_save)
         except Exception:
-            return self._save_to_file()
+            self._save_to_file()
 
     def load_from_keyring(self) -> bool:
         try:
@@ -84,6 +96,30 @@ class KeyManager:
             return self._load_from_file()
         except Exception:
             return self._load_from_file()
+
+    def load_from_keyring_async(self, callback: Callable[[bool], None]):
+        AsyncBridge.get().run(self._do_load_from_keyring(callback))
+
+    async def _do_load_from_keyring(self, callback: Callable[[bool], None]):
+        result = False
+        try:
+            import secretstorage
+            loop = asyncio.get_running_loop()
+            def _blocking_load():
+                connection = secretstorage.dbus_init()
+                collection = secretstorage.get_default_collection(connection)
+                for item in collection.get_all_items():
+                    if item.get_label() == f"{Config.APP_ID} - nsec":
+                        return item.get_secret().decode()
+                return None
+            secret = await loop.run_in_executor(None, _blocking_load)
+            if secret:
+                result = self.import_key(secret)
+            if not result:
+                result = self._load_from_file()
+        except Exception:
+            result = self._load_from_file()
+        AsyncBridge.get().idle_add(callback, result)
 
     def clear_key(self):
         self._keys = None
